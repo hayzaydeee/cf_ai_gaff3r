@@ -1,0 +1,56 @@
+@import "tailwindcss";
+
+@theme {
+  /* Fonts */
+  --font-display: 'League Spartan', sans-serif;
+  --font-body: 'EB Garamond', serif;
+
+  /* Colors — light mode base */
+  --color-cream: #FAF3E1;
+  --color-beige: #F5E7C6;
+  --color-beige-hover: #EFE0B8;
+  --color-orange: #FA8112;
+  --color-orange-hover: #E5740F;
+  --color-char: #2D2421;
+  --color-char-light: #5C4F49;
+  --color-char-muted: #8A7D76;
+
+  /* Semantic */
+  --color-success: #2E7D32;
+  --color-error: #C62828;
+  --color-warning: #E65100;
+
+  /* Radii */
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 16px;
+  --radius-pill: 999px;
+
+  /* Breakpoints */
+  --breakpoint-tablet: 768px;
+  --breakpoint-desktop: 1200px;
+}
+
+/* Base styles */
+body {
+  font-family: var(--font-body);
+  background-color: var(--color-cream);
+  color: var(--color-char);
+  margin: 0;
+}
+
+h1, h2, h3, h4, h5, h6 {
+  font-family: var(--font-display);
+}
+
+/* Dark mode overrides */
+[data-theme="dark"] {
+  --color-cream: #2D2421;
+  --color-beige: #3D3330;
+  --color-beige-hover: #4D433F;
+  --color-char: #FAF3E1;
+  --color-char-light: #D4C8B8;
+  --color-char-muted: #A89888;
+  --color-success: #66BB6A;
+  --color-error: #EF5350;
+}

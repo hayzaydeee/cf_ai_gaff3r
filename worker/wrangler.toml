@@ -1,0 +1,17 @@
+name = "gaff3r-worker"
+main = "src/index.ts"
+compatibility_date = "2024-12-01"
+
+[durable_objects]
+bindings = [{ name = "USER_STATE", class_name = "UserState" }]
+
+[[migrations]]
+tag = "v1"
+new_classes = ["UserState"]
+
+[[kv_namespaces]]
+binding = "FPL_CACHE"
+id = ""  # TODO: Create via `wrangler kv namespace create FPL_CACHE`
+
+[ai]
+binding = "AI"
