@@ -79,3 +79,107 @@ export interface GameweekAccuracy {
   total: number;
   correct: number;
 }
+
+// ── Match Context Types ──
+
+export interface PLMatchContext {
+  type: 'pl';
+  fixture: {
+    id: number;
+    homeTeam: string;
+    awayTeam: string;
+    competition: 'Premier League';
+    matchDate: string;
+    matchday: number;
+  };
+  fplDifficulty: { home: number; away: number };
+  homeTeam: PLTeamContext;
+  awayTeam: PLTeamContext;
+}
+
+export interface PLTeamContext {
+  name: string;
+  leaguePosition: number;
+  points: number;
+  played: number;
+  won: number;
+  drawn: number;
+  lost: number;
+  goalsFor: number;
+  goalsAgainst: number;
+  goalDifference: number;
+  strength: {
+    overall: number;
+    attackHome: number;
+    attackAway: number;
+    defenceHome: number;
+    defenceAway: number;
+  };
+  form: string[];
+  formSummary: string;
+  recentResults: RecentResult[];
+  keyPlayers: KeyPlayer[];
+  injuries: InjuryReport[];
+  setPieceTakers?: string;
+}
+
+export interface StandardMatchContext {
+  type: 'standard';
+  fixture: {
+    id: number;
+    homeTeam: string;
+    awayTeam: string;
+    competition: string;
+    competitionCode: string;
+    matchDate: string;
+    matchday?: number;
+  };
+  homeTeam: StandardTeamContext;
+  awayTeam: StandardTeamContext;
+}
+
+export interface StandardTeamContext {
+  name: string;
+  leaguePosition: number;
+  totalTeams: number;
+  points: number;
+  played: number;
+  won: number;
+  drawn: number;
+  lost: number;
+  goalsFor: number;
+  goalsAgainst: number;
+  goalDifference: number;
+  form: string[];
+  formSummary: string;
+  recentResults: RecentResult[];
+}
+
+export interface KeyPlayer {
+  name: string;
+  position: string;
+  form: number;
+  goals: number;
+  assists: number;
+  xG: number;
+  xA: number;
+  minutes: number;
+  status: 'available' | 'injured' | 'doubtful' | 'suspended';
+}
+
+export interface InjuryReport {
+  player: string;
+  status: string;
+  news: string;
+  chanceOfPlaying: number | null;
+}
+
+export interface RecentResult {
+  opponent: string;
+  goalsFor: number;
+  goalsAgainst: number;
+  result: string; // W, D, L
+  home: boolean;
+}
+
+export type MatchContext = PLMatchContext | StandardMatchContext;

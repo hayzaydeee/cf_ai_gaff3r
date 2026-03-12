@@ -41,6 +41,8 @@ export interface FixtureItem {
   finished: boolean;
   homeScore: number | null;
   awayScore: number | null;
+  competition: string;
+  competitionCode: string;
 }
 
 export interface GameweekResponse {
