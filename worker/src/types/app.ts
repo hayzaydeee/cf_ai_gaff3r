@@ -28,6 +28,8 @@ export interface Prediction {
   awayTeam: string;
   homeTeamId: number;
   awayTeamId: number;
+  competition: string;
+  competitionCode: string;           // "PL", "PD", "BL1", "SA", "FL1", "CL"
   kickoffTime: string;
 
   predictedScore: Score;
@@ -60,9 +62,16 @@ export interface AccuracyStats {
   outcomeAccuracy: number;
   exactScores: number;
   scoreAccuracy: number;
+  avgGoalDifference: number;
   currentStreak: number;
   bestStreak: number;
   byGameweek: GameweekAccuracy[];
+  byCompetition: Record<string, {
+    competitionName: string;
+    total: number;
+    correctOutcomes: number;
+    outcomeAccuracy: number;
+  }>;
 }
 
 export interface GameweekAccuracy {
