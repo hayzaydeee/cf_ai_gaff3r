@@ -1,52 +1,66 @@
-// Prediction row — fixture, prediction, actual, result, confidence
+// Prediction row — fixture, prediction, actual, result, confidence + chat link
 
+import { useNavigate } from 'react-router-dom';
 import type { Prediction } from '../../types';
 
 interface PredictionRowProps {
-    prediction: Prediction;
+  prediction: Prediction;
 }
 
 export default function PredictionRow({ prediction: pred }: PredictionRowProps) {
-    const isCorrect = pred.outcomeCorrect;
-    const isExact = pred.exactScoreCorrect;
-    const isResolved = pred.status === 'resolved';
+  const navigate = useNavigate();
+  const isCorrect = pred.outcomeCorrect;
+  const isExact = pred.exactScoreCorrect;
+  const isResolved = pred.status === 'resolved';
 
-    return (
-        <div className={`pred-row ${isResolved ? (isCorrect ? 'pred-row-correct' : 'pred-row-wrong') : 'pred-row-pending'}`}
-            id={`pred-${pred.id}`}>
-            <div className="pred-row-teams">
-                <span className="pred-row-team">{pred.homeTeam}</span>
-                <span className="pred-row-vs">vs</span>
-                <span className="pred-row-team">{pred.awayTeam}</span>
-            </div>
+  const handleViewChat = () => {
+    navigate(`/chat/${pred.fixtureId}?gw=${pred.gameweek}`);
+  };
 
-            <div className="pred-row-scores">
-                <div className="pred-row-score-block">
-                    <span className="pred-row-score-label">Called</span>
-                    <span className="pred-row-score-value">
-                        {pred.predictedScore.home}-{pred.predictedScore.away}
-                    </span>
-                </div>
-                {isResolved && pred.actualScore && (
-                    <div className="pred-row-score-block">
-                        <span className="pred-row-score-label">Actual</span>
-                        <span className="pred-row-score-value">
-                            {pred.actualScore.home}-{pred.actualScore.away}
-                        </span>
-                    </div>
-                )}
-            </div>
+  return (
+    <div className={`pred-row ${isResolved ? (isCorrect ? 'pred-row-correct' : 'pred-row-wrong') : 'pred-row-pending'}`}
+      id={`pred-${pred.id}`}>
+      <div className="pred-row-teams">
+        <span className="pred-row-team">{pred.homeTeam}</span>
+        <span className="pred-row-vs">vs</span>
+        <span className="pred-row-team">{pred.awayTeam}</span>
+      </div>
 
-            <div className="pred-row-meta">
-                <span className={`pred-row-confidence pred-conf-${pred.confidence}`}>
-                    {pred.confidence.toUpperCase()}
-                </span>
-                <span className={`pred-row-status ${isResolved ? (isCorrect ? 'status-correct' : 'status-wrong') : 'status-pending'}`}>
-                    {isResolved ? (isExact ? '🎯 Exact' : isCorrect ? '✅ Correct' : '❌ Wrong') : '⏳ Pending'}
-                </span>
-            </div>
+      <div className="pred-row-scores">
+        <div className="pred-row-score-block">
+          <span className="pred-row-score-label">Called</span>
+          <span className="pred-row-score-value">
+            {pred.predictedScore.home}-{pred.predictedScore.away}
+          </span>
+        </div>
+        {isResolved && pred.actualScore && (
+          <div className="pred-row-score-block">
+            <span className="pred-row-score-label">Actual</span>
+            <span className="pred-row-score-value">
+              {pred.actualScore.home}-{pred.actualScore.away}
+            </span>
+          </div>
+        )}
+      </div>
 
-            <style>{`
+      <div className="pred-row-meta">
+        <span className={`pred-row-confidence pred-conf-${pred.confidence}`}>
+          {pred.confidence.toUpperCase()}
+        </span>
+        <span className={`pred-row-status ${isResolved ? (isCorrect ? 'status-correct' : 'status-wrong') : 'status-pending'}`}>
+          {isResolved ? (isExact ? '🎯 Exact' : isCorrect ? '✅ Correct' : '❌ Wrong') : '⏳ Pending'}
+        </span>
+      </div>
+
+      <button
+        className="pred-row-chat-btn"
+        onClick={handleViewChat}
+        title="View conversation"
+      >
+        💬
+      </button>
+
+      <style>{`
         .pred-row {
           display: flex;
           align-items: center;
@@ -133,7 +147,25 @@ export default function PredictionRow({ prediction: pred }: PredictionRowProps) 
         .status-correct { color: var(--color-success); }
         .status-wrong { color: var(--color-error); }
         .status-pending { color: var(--color-char-muted); }
+        .pred-row-chat-btn {
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          width: 32px;
+          height: 32px;
+          border: none;
+          border-radius: var(--radius-sm);
+          background: var(--color-beige);
+          cursor: pointer;
+          font-size: 14px;
+          flex-shrink: 0;
+          transition: all var(--transition-fast);
+        }
+        .pred-row-chat-btn:hover {
+          background: var(--color-orange-soft);
+          transform: scale(1.1);
+        }
       `}</style>
-        </div>
-    );
+    </div>
+  );
 }

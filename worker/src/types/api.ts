@@ -22,6 +22,16 @@ export interface ChatResponse {
     outcomeAccuracy: number;
     currentStreak: number;
   };
+  fixtureFound: boolean;
+  dataSource: 'fpl' | 'football-data' | null;
+  identifiedFixture: {
+    id: number;
+    homeTeam: string;
+    awayTeam: string;
+    kickoffTime: string;
+    competition: string;
+    competitionCode: string;
+  } | null;
 }
 
 export interface FixturesResponse {

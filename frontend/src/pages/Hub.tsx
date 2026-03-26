@@ -10,110 +10,110 @@ import GwSelector from '../components/hub/GwSelector';
 import FixturePreview from '../components/hub/FixturePreview';
 
 export default function Hub() {
-    const navigate = useNavigate();
-    const { currentGw, loading: gwLoading } = useGameweek();
-    const [selectedGw, setSelectedGw] = useState<number | null>(null);
-    const [fixtures, setFixtures] = useState<FixtureData[]>([]);
-    const [fixturesLoading, setFixturesLoading] = useState(false);
-    const [selectedFixture, setSelectedFixture] = useState<FixtureData | null>(null);
+  const navigate = useNavigate();
+  const { currentGw, loading: gwLoading } = useGameweek();
+  const [selectedGw, setSelectedGw] = useState<number | null>(null);
+  const [fixtures, setFixtures] = useState<FixtureData[]>([]);
+  const [fixturesLoading, setFixturesLoading] = useState(false);
+  const [selectedFixture, setSelectedFixture] = useState<FixtureData | null>(null);
 
-    // Set initial GW when loaded
-    useEffect(() => {
-        if (currentGw && !selectedGw) {
-            setSelectedGw(currentGw);
+  // Set initial GW when loaded
+  useEffect(() => {
+    if (currentGw && !selectedGw) {
+      setSelectedGw(currentGw);
+    }
+  }, [currentGw, selectedGw]);
+
+  // Fetch fixtures when GW changes
+  useEffect(() => {
+    if (!selectedGw) return;
+    let cancelled = false;
+
+    async function load() {
+      setFixturesLoading(true);
+      try {
+        const data = await getFixtures(selectedGw!);
+        if (!cancelled) {
+          setFixtures(data.fixtures);
+          setSelectedFixture(null);
         }
-    }, [currentGw, selectedGw]);
-
-    // Fetch fixtures when GW changes
-    useEffect(() => {
-        if (!selectedGw) return;
-        let cancelled = false;
-
-        async function load() {
-            setFixturesLoading(true);
-            try {
-                const data = await getFixtures(selectedGw!);
-                if (!cancelled) {
-                    setFixtures(data.fixtures);
-                    setSelectedFixture(null);
-                }
-            } catch (err) {
-                console.error('Failed to load fixtures:', err);
-                if (!cancelled) setFixtures([]);
-            } finally {
-                if (!cancelled) setFixturesLoading(false);
-            }
-        }
-
-        load();
-        return () => { cancelled = true; };
-    }, [selectedGw]);
-
-    const handleFixtureClick = (fixture: FixtureData) => {
-        // On mobile/tablet: navigate directly to chat
-        if (window.innerWidth < 1200) {
-            navigate(`/chat/${fixture.id}`);
-        } else {
-            // On desktop: show in preview panel
-            setSelectedFixture(fixture);
-        }
-    };
-
-    if (gwLoading || !selectedGw) {
-        return (
-            <div className="hub-loading">
-                <div className="spinner" />
-                <style>{hubStyles}</style>
-            </div>
-        );
+      } catch (err) {
+        console.error('Failed to load fixtures:', err);
+        if (!cancelled) setFixtures([]);
+      } finally {
+        if (!cancelled) setFixturesLoading(false);
+      }
     }
 
+    load();
+    return () => { cancelled = true; };
+  }, [selectedGw]);
+
+  const handleFixtureClick = (fixture: FixtureData) => {
+    // On mobile/tablet: navigate directly to chat
+    if (window.innerWidth < 1200) {
+      navigate(`/chat/${fixture.id}?gw=${selectedGw}`);
+    } else {
+      // On desktop: show in preview panel
+      setSelectedFixture(fixture);
+    }
+  };
+
+  if (gwLoading || !selectedGw) {
     return (
-        <div className="hub" id="hub-page">
-            <div className="hub-header">
-                <h1 className="hub-title">Match Hub</h1>
-                <GwSelector
-                    currentGw={currentGw!}
-                    selectedGw={selectedGw}
-                    onSelect={setSelectedGw}
-                />
-            </div>
-
-            <div className="hub-content">
-                <div className="hub-fixtures">
-                    {fixturesLoading ? (
-                        <div className="hub-fixture-skeletons">
-                            {[1, 2, 3, 4, 5, 6].map(i => (
-                                <div key={i} className="skeleton fixture-skeleton" />
-                            ))}
-                        </div>
-                    ) : fixtures.length === 0 ? (
-                        <div className="hub-empty">
-                            <p>No fixtures found for Gameweek {selectedGw}</p>
-                        </div>
-                    ) : (
-                        <div className="hub-fixture-grid">
-                            {fixtures.map(f => (
-                                <FixtureCard
-                                    key={f.id}
-                                    fixture={f}
-                                    isSelected={selectedFixture?.id === f.id}
-                                    onClick={() => handleFixtureClick(f)}
-                                />
-                            ))}
-                        </div>
-                    )}
-                </div>
-
-                {/* Desktop only: preview panel */}
-                <div className="hub-preview">
-                    <FixturePreview fixture={selectedFixture} />
-                </div>
-            </div>
-
-            <style>{hubStyles}</style>
-        </div>
+      <div className="hub-loading">
+        <div className="spinner" />
+        <style>{hubStyles}</style>
+      </div>
     );
+  }
+
+  return (
+    <div className="hub" id="hub-page">
+      <div className="hub-header">
+        <h1 className="hub-title">Match Hub</h1>
+        <GwSelector
+          currentGw={currentGw!}
+          selectedGw={selectedGw}
+          onSelect={setSelectedGw}
+        />
+      </div>
+
+      <div className="hub-content">
+        <div className="hub-fixtures">
+          {fixturesLoading ? (
+            <div className="hub-fixture-skeletons">
+              {[1, 2, 3, 4, 5, 6].map(i => (
+                <div key={i} className="skeleton fixture-skeleton" />
+              ))}
+            </div>
+          ) : fixtures.length === 0 ? (
+            <div className="hub-empty">
+              <p>No fixtures found for Gameweek {selectedGw}</p>
+            </div>
+          ) : (
+            <div className="hub-fixture-grid">
+              {fixtures.map(f => (
+                <FixtureCard
+                  key={f.id}
+                  fixture={f}
+                  isSelected={selectedFixture?.id === f.id}
+                  onClick={() => handleFixtureClick(f)}
+                />
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Desktop only: preview panel */}
+        <div className="hub-preview">
+          <FixturePreview fixture={selectedFixture} gameweek={selectedGw} />
+        </div>
+      </div>
+
+      <style>{hubStyles}</style>
+    </div>
+  );
 }
 
 const hubStyles = `

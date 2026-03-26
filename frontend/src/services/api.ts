@@ -1,7 +1,7 @@
 // Frontend API client
 // Handles userId generation, auth headers, and typed fetch wrappers
 
-import type { Fixture, Prediction, PredictionSummary } from '../types';
+import type { Fixture, Prediction, PredictionSummary, ChatMessage } from '../types';
 
 const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8787';
 
@@ -57,6 +57,16 @@ export interface ChatResponseData {
     outcomeAccuracy: number;
     currentStreak: number;
   };
+  fixtureFound: boolean;
+  dataSource: 'fpl' | 'football-data' | null;
+  identifiedFixture: {
+    id: number;
+    homeTeam: string;
+    awayTeam: string;
+    kickoffTime: string;
+    competition: string;
+    competitionCode: string;
+  } | null;
 }
 
 export interface PredictionsData {
@@ -124,4 +134,11 @@ export function getStats(): Promise<StatsData> {
  */
 export function resolvePredictions(): Promise<{ resolved: number; errors: number }> {
   return fetchAPI('/api/resolve', { method: 'POST' });
+}
+
+/**
+ * GET /api/chat/:gw — load stored chat history
+ */
+export function getChatHistory(gw: number): Promise<{ messages: ChatMessage[] }> {
+  return fetchAPI(`/api/chat/${gw}`);
 }

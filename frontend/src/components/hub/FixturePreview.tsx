@@ -4,65 +4,66 @@ import type { FixtureData } from '../../services/api';
 import { useNavigate } from 'react-router-dom';
 
 interface FixturePreviewProps {
-    fixture: FixtureData | null;
+  fixture: FixtureData | null;
+  gameweek?: number;
 }
 
-export default function FixturePreview({ fixture }: FixturePreviewProps) {
-    const navigate = useNavigate();
+export default function FixturePreview({ fixture, gameweek }: FixturePreviewProps) {
+  const navigate = useNavigate();
 
-    if (!fixture) {
-        return (
-            <div className="fixture-preview fixture-preview-empty" id="fixture-preview">
-                <p className="preview-hint">Select a fixture to see details</p>
-                <style>{previewStyles}</style>
-            </div>
-        );
-    }
-
-    const kickoff = new Date(fixture.kickoffTime);
-
+  if (!fixture) {
     return (
-        <div className="fixture-preview" id="fixture-preview">
-            <div className="preview-comp">{fixture.competition}</div>
-
-            <div className="preview-matchup">
-                <div className="preview-team">
-                    <span className="preview-team-name">{fixture.homeTeam}</span>
-                    {fixture.homeDifficulty > 0 && (
-                        <span className="preview-fdr">FDR: {fixture.homeDifficulty}/5</span>
-                    )}
-                </div>
-                <span className="preview-vs">vs</span>
-                <div className="preview-team">
-                    <span className="preview-team-name">{fixture.awayTeam}</span>
-                    {fixture.awayDifficulty > 0 && (
-                        <span className="preview-fdr">FDR: {fixture.awayDifficulty}/5</span>
-                    )}
-                </div>
-            </div>
-
-            <div className="preview-details">
-                <div className="preview-detail">
-                    <span className="preview-detail-label">Kickoff</span>
-                    <span className="preview-detail-value">
-                        {kickoff.toLocaleDateString([], { weekday: 'long', day: 'numeric', month: 'long' })}
-                        {' • '}
-                        {kickoff.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                    </span>
-                </div>
-            </div>
-
-            <button
-                className="preview-cta"
-                onClick={() => navigate(`/chat/${fixture.id}`)}
-                id="preview-analyze-btn"
-            >
-                ⚽ Ask the Gaffer
-            </button>
-
-            <style>{previewStyles}</style>
-        </div>
+      <div className="fixture-preview fixture-preview-empty" id="fixture-preview">
+        <p className="preview-hint">Select a fixture to see details</p>
+        <style>{previewStyles}</style>
+      </div>
     );
+  }
+
+  const kickoff = new Date(fixture.kickoffTime);
+
+  return (
+    <div className="fixture-preview" id="fixture-preview">
+      <div className="preview-comp">{fixture.competition}</div>
+
+      <div className="preview-matchup">
+        <div className="preview-team">
+          <span className="preview-team-name">{fixture.homeTeam}</span>
+          {fixture.homeDifficulty > 0 && (
+            <span className="preview-fdr">FDR: {fixture.homeDifficulty}/5</span>
+          )}
+        </div>
+        <span className="preview-vs">vs</span>
+        <div className="preview-team">
+          <span className="preview-team-name">{fixture.awayTeam}</span>
+          {fixture.awayDifficulty > 0 && (
+            <span className="preview-fdr">FDR: {fixture.awayDifficulty}/5</span>
+          )}
+        </div>
+      </div>
+
+      <div className="preview-details">
+        <div className="preview-detail">
+          <span className="preview-detail-label">Kickoff</span>
+          <span className="preview-detail-value">
+            {kickoff.toLocaleDateString([], { weekday: 'long', day: 'numeric', month: 'long' })}
+            {' • '}
+            {kickoff.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+          </span>
+        </div>
+      </div>
+
+      <button
+        className="preview-cta"
+        onClick={() => navigate(`/chat/${fixture.id}${gameweek ? `?gw=${gameweek}` : ''}`)}
+        id="preview-analyze-btn"
+      >
+        ⚽ Ask the Gaffer
+      </button>
+
+      <style>{previewStyles}</style>
+    </div>
+  );
 }
 
 const previewStyles = `

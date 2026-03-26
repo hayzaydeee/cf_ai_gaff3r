@@ -31,3 +31,7 @@ PROMPT 2
 PROMPT 3
 
 "I want us to work on the actual UI layout. lets think laptop, ipad and mobile. we should comprehensively reason out the specifics, tweaks and responsive behaviour. Basically we dont have to settle with what the PRD suggests. lets run through several UI options and possible pages (it musnt be a single page app), that would be effective solely based on the premise of the app."
+
+PROMPT 4
+
+"I've made some changes to the PRD. review it in depth and breakdown changes from our original approach and plot a plan for getting there."

@@ -1,7 +1,7 @@
 // Chat page — AI conversation with match context sidebar
 
 import { useEffect, useRef } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { useGameweek } from '../hooks/useGameweek';
 import { useChat } from '../hooks/useChat';
 import ChatInput from '../components/chat/ChatInput';
@@ -10,104 +10,110 @@ import MatchContext from '../components/chat/MatchContext';
 import type { FixtureData } from '../services/api';
 
 export default function Chat() {
-    const { fixtureId: fixtureIdParam } = useParams<{ fixtureId?: string }>();
-    const navigate = useNavigate();
-    const { currentGw, loading: gwLoading } = useGameweek();
-    const fixtureId = fixtureIdParam ? parseInt(fixtureIdParam) : undefined;
-    const { messages, loading, error, send } = useChat(currentGw);
-    const messagesEndRef = useRef<HTMLDivElement>(null);
+  const { fixtureId: fixtureIdParam } = useParams<{ fixtureId?: string }>();
+  const [searchParams] = useSearchParams();
+  const navigate = useNavigate();
+  const { currentGw, loading: gwLoading } = useGameweek();
+  const fixtureId = fixtureIdParam ? parseInt(fixtureIdParam) : undefined;
 
-    // Auto-scroll to bottom on new messages
-    useEffect(() => {
-        messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-    }, [messages]);
+  // Use GW from URL if present, otherwise fall back to current
+  const gwParam = searchParams.get('gw');
+  const activeGw = gwParam ? parseInt(gwParam) : currentGw;
 
-    const handleSelectFixture = (fixture: FixtureData) => {
-        navigate(`/chat/${fixture.id}`);
-    };
+  const { messages, loading, error, send } = useChat(activeGw);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
 
-    const handleSend = (message: string) => {
-        send(message, fixtureId);
-    };
+  // Auto-scroll to bottom on new messages
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [messages]);
 
-    if (gwLoading || !currentGw) {
-        return (
-            <div className="chat-loading">
-                <div className="spinner" />
-                <style>{chatStyles}</style>
-            </div>
-        );
-    }
+  const handleSelectFixture = (fixture: FixtureData) => {
+    navigate(`/chat/${fixture.id}?gw=${activeGw}`);
+  };
 
+  const handleSend = (message: string) => {
+    send(message, fixtureId);
+  };
+
+  if (gwLoading || !activeGw) {
     return (
-        <div className="chat-page" id="chat-page">
-            <div className="chat-main">
-                <div className="chat-header">
-                    <h2 className="chat-title">⚽ The Gaffer</h2>
-                    {fixtureId && (
-                        <button
-                            className="chat-clear-btn"
-                            onClick={() => navigate('/chat')}
-                        >
-                            Clear fixture
-                        </button>
-                    )}
-                </div>
-
-                <div className="chat-messages" id="chat-messages">
-                    {messages.length === 0 && (
-                        <div className="chat-empty">
-                            <div className="chat-empty-icon">⚽</div>
-                            <h3 className="chat-empty-title">Ready for a chat, gaffer?</h3>
-                            <p className="chat-empty-hint">
-                                {fixtureId
-                                    ? 'Ask me about this fixture — form, injuries, predictions, the lot.'
-                                    : 'Pick a fixture from the sidebar or just ask me about any match.'}
-                            </p>
-                        </div>
-                    )}
-
-                    {messages.map(msg => (
-                        <MessageBubble key={msg.id} message={msg} />
-                    ))}
-
-                    {loading && (
-                        <div className="chat-typing">
-                            <div className="msg-avatar">⚽</div>
-                            <div className="typing-indicator">
-                                <span /><span /><span />
-                            </div>
-                        </div>
-                    )}
-
-                    {error && (
-                        <div className="chat-error">
-                            ⚠️ {error}
-                        </div>
-                    )}
-
-                    <div ref={messagesEndRef} />
-                </div>
-
-                <ChatInput
-                    onSend={handleSend}
-                    disabled={loading}
-                    placeholder={fixtureId ? 'Ask about this match...' : 'Ask about any match...'}
-                />
-            </div>
-
-            {/* Desktop sidebar */}
-            <div className="chat-sidebar">
-                <MatchContext
-                    fixtureId={fixtureId}
-                    gameweek={currentGw}
-                    onSelectFixture={handleSelectFixture}
-                />
-            </div>
-
-            <style>{chatStyles}</style>
-        </div>
+      <div className="chat-loading">
+        <div className="spinner" />
+        <style>{chatStyles}</style>
+      </div>
     );
+  }
+
+  return (
+    <div className="chat-page" id="chat-page">
+      <div className="chat-main">
+        <div className="chat-header">
+          <h2 className="chat-title">⚽ The Gaffer</h2>
+          {fixtureId && (
+            <button
+              className="chat-clear-btn"
+              onClick={() => navigate('/chat')}
+            >
+              Clear fixture
+            </button>
+          )}
+        </div>
+
+        <div className="chat-messages" id="chat-messages">
+          {messages.length === 0 && (
+            <div className="chat-empty">
+              <div className="chat-empty-icon">⚽</div>
+              <h3 className="chat-empty-title">Ready for a chat, gaffer?</h3>
+              <p className="chat-empty-hint">
+                {fixtureId
+                  ? 'Ask me about this fixture — form, injuries, predictions, the lot.'
+                  : 'Pick a fixture from the sidebar or just ask me about any match.'}
+              </p>
+            </div>
+          )}
+
+          {messages.map(msg => (
+            <MessageBubble key={msg.id} message={msg} />
+          ))}
+
+          {loading && (
+            <div className="chat-typing">
+              <div className="msg-avatar">⚽</div>
+              <div className="typing-indicator">
+                <span /><span /><span />
+              </div>
+            </div>
+          )}
+
+          {error && (
+            <div className="chat-error">
+              ⚠️ {error}
+            </div>
+          )}
+
+          <div ref={messagesEndRef} />
+        </div>
+
+        <ChatInput
+          onSend={handleSend}
+          disabled={loading}
+          placeholder={fixtureId ? 'Ask about this match...' : 'Ask about any match...'}
+        />
+      </div>
+
+      {/* Desktop sidebar */}
+      <div className="chat-sidebar">
+        <MatchContext
+          fixtureId={fixtureId}
+          gameweek={activeGw}
+          onSelectFixture={handleSelectFixture}
+        />
+      </div>
+
+      <style>{chatStyles}</style>
+    </div>
+  );
 }
 
 const chatStyles = `

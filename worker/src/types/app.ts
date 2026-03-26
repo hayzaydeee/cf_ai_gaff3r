@@ -5,6 +5,15 @@ export interface UserProfile {
   createdAt: string;
   lastActiveAt: string;
   theme: 'light' | 'dark';
+  preferences?: UserPreferences;
+}
+
+export interface UserPreferences {
+  favouriteTeam?: string;
+  favouriteTeamId?: number;
+  preferredLeagues: string[];           // e.g. ["PL", "CL"]
+  analysisStyle: 'brief' | 'detailed';
+  teamQueryCounts: Record<string, number>; // tracks which teams user asks about most
 }
 
 export interface ChatMessage {

@@ -51,6 +51,18 @@ export default {
         return addCors(errorResponse('Missing x-user-id header', 401));
       }
 
+      if (path.match(/^\/api\/chat\/\d+$/) && request.method === 'GET') {
+        const gw = parseInt(path.split('/').pop()!);
+        const doId = env.USER_STATE.idFromName(userId);
+        const doStub = env.USER_STATE.get(doId);
+        const doRes = await doStub.fetch(new Request(`http://do/chat/${gw}`));
+        const messages = await doRes.json();
+        response = new Response(JSON.stringify({ messages }), {
+          headers: { 'Content-Type': 'application/json' },
+        });
+        return addCors(response);
+      }
+
       if (path === '/api/chat' && request.method === 'POST') {
         response = await handleChat(request, userId, env);
         return addCors(response);

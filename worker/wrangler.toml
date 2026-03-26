@@ -11,7 +11,7 @@ new_classes = ["UserState"]
 
 [[kv_namespaces]]
 binding = "FPL_CACHE"
-id = ""  # TODO: Create via `wrangler kv namespace create FPL_CACHE`
+id = "d5fe3844a311424e9e6fb8765807e036"
 
 [ai]
 binding = "AI"
