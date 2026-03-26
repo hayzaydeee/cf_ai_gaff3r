@@ -21,6 +21,10 @@ export interface ChatMessage {
   content: string;
   timestamp: string;
   prediction?: PredictionSummary | null;
+  metadata?: {
+    fixtureId?: number;
+    predictionId?: string;
+  };
 }
 
 export interface PredictionSummary {

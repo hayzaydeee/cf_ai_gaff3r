@@ -1,4 +1,6 @@
 // Current gameweek hook
+// Returns `activeGw` = next GW (the upcoming one) so the UI always
+// shows fixtures ahead of you, not ones that have already been played.
 
 import { useState, useEffect } from 'react';
 import { getGameweek, type GameweekData } from '../services/api';
@@ -33,10 +35,14 @@ export function useGameweek() {
   }, []);
 
   return {
-    currentGw: data?.current ?? null,
+    // activeGw = next GW so the interface always shows upcoming fixtures.
+    // After the current GW's matches play, this automatically moves forward.
+    currentGw: data?.next ?? null,       // "current" from the UI's perspective = the next upcoming GW
+    currentGwActual: data?.current ?? null, // the FPL-reported current GW (for standings context)
     nextGw: data?.next ?? null,
     nextDeadline: data?.nextDeadline ?? null,
     loading,
     error,
   };
 }
+

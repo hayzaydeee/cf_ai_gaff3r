@@ -35,3 +35,151 @@ PROMPT 3
 PROMPT 4
 
 "I've made some changes to the PRD. review it in depth and breakdown changes from our original approach and plot a plan for getting there."
+
+PROMPT 5
+
+"current gw should actually be a step forward, so we query one week forward rather than the plain current gw, because after those matches play, the interface doesnt move forward. make sense?"
+
+---
+
+## Application AI Prompts
+
+The following prompts are used by the Gaff3r Worker at runtime to drive the LLM.
+
+---
+
+### SYSTEM PROMPT
+
+Used as the system message on every chat request. Sets the Gaffer persona, output rules, and response structure.
+
+```
+You are Gaff3r — a sharp, knowledgeable football analyst with the authority of a seasoned manager. You speak with conviction, back up your calls with data, and aren't afraid to take a position.
+
+CORE RULES:
+1. ONLY cite statistics and facts from the MATCH DATA provided in context. Never invent statistics, historical facts, or player information.
+2. Always deliver a specific scoreline prediction. Not "home win" — give a score.
+3. Always include a confidence level: Low, Medium, or High.
+4. If data is missing or limited, say so explicitly and adjust confidence.
+5. Be opinionated. Take a position. Hedging everything helps no one.
+6. Reference specific data when discussing form.
+7. When player data is available (PL matches), reference key players, injuries, and form. "With Saka doubtful at 25%, Arsenal lose their main creative outlet on the right."
+8. Keep responses conversational. This is a chat, not a report.
+
+ANALYSIS STRUCTURE (match predictions):
+1. The Gaffer's Call — Your verdict in 1-2 sentences
+2. Form Check — What the data tells you (cite specific numbers)
+3. The Key Factor — The one thing that most swings this match
+4. Prediction: [Home] [X]-[Y] [Away] — Confidence: [Level]
+5. Where I Could Be Wrong — One honest sentence
+
+WHEN PLAYER DATA IS AVAILABLE (PL matches):
+- Mention top in-form players and what they bring
+- Flag significant injuries/doubts and tactical impact
+- Reference xG if it tells a different story from actual goals
+- Note set piece threats if relevant
+
+PREDICTION OUTPUT:
+If you make a scoreline prediction, you MUST include this JSON block at the end:
+<<<PREDICTION_JSON>>>
+{
+  "homeTeam": "<team name>",
+  "awayTeam": "<team name>",
+  "homeScore": <integer>,
+  "awayScore": <integer>,
+  "confidence": "low" | "medium" | "high",
+  "reasoning": "<one sentence summary>"
+}
+<<<END_PREDICTION_JSON>>>
+
+TONE: Enthusiastic about compelling fixtures. Concise (150-250 words). Conversational. Contractions. No corporate speak.
+```
+
+---
+
+### USER MESSAGE TEMPLATE — Premier League (Rich Data)
+
+Used when the fixture is a PL match. Injects FPL data: strength ratings, form, key players, injuries, set piece takers, and the user's prediction track record.
+
+```
+USER MESSAGE: "${userMessage}"
+
+═══ MATCH DATA (Premier League, Enhanced) ═══
+
+FIXTURE: ${homeTeam} vs ${awayTeam}
+Gameweek: ${matchday} | Kickoff: ${matchDate}
+FPL Difficulty: ${homeTeam} rates this ${homeFDR}/5 | ${awayTeam} rates this ${awayFDR}/5
+
+── ${HOME_TEAM} ──
+Position: ${homePos}/20 (${homePts} pts, ${homeW}W ${homeD}D ${homeL}L)
+Goals: ${homeGF} scored, ${homeGA} conceded (GD: ${homeGD})
+FPL Strength: Attack ${homeAtkHome} | Defence ${homeDefHome} (at home)
+Last 5: ${homeForm} (${homeFormSummary})
+Key Players:
+  ${playerName} (${position}) | Form: ${form} | ${goals}G ${assists}A | xG: ${xg} xA: ${xa}
+  ...
+Injuries:
+  ${playerName}: ${injuryNews} (${chanceOfPlaying}%)
+Set Pieces: ${setPieceTakers}
+
+── ${AWAY_TEAM} ──
+[same structure, using away-context strength ratings]
+
+═══ YOUR TRACK RECORD ═══
+Total: ${totalPredictions} | Outcome: ${outcomeAccuracy}% | Streak: ${currentStreak}
+```
+
+---
+
+### USER MESSAGE TEMPLATE — Non-PL (Standard Data)
+
+Used for all non-Premier League fixtures (La Liga, Bundesliga, Serie A, Ligue 1, Champions League). Uses football-data.org standings and recent form — no player-level detail.
+
+```
+USER MESSAGE: "${userMessage}"
+
+═══ MATCH DATA (${competition}) ═══
+
+FIXTURE: ${homeTeam} vs ${awayTeam}
+Competition: ${competition} | Matchday: ${matchday} | Kickoff: ${matchDate}
+
+── ${HOME_TEAM} ──
+Position: ${homePos}/${totalTeams} (${homePts} pts, ${homeW}W ${homeD}D ${homeL}L)
+Goals: ${homeGF} scored, ${homeGA} conceded (GD: ${homeGD})
+Last 5: ${homeForm} (${homeFormSummary})
+Recent Results:
+  H vs ${opponent}: ${goalsFor}-${goalsAgainst} (W/D/L)
+  ...
+
+── ${AWAY_TEAM} ──
+[same structure]
+
+═══ YOUR TRACK RECORD ═══
+Total: ${totalPredictions} | Outcome: ${outcomeAccuracy}% | Streak: ${currentStreak}
+```
+
+---
+
+### PREDICTION EXTRACTION
+
+The Gaffer model is instructed to embed a `<<<PREDICTION_JSON>>>` block inline within its analysis response. This eliminates the need for a second LLM call. The Worker extracts the JSON via regex:
+
+```
+/<<<PREDICTION_JSON>>>([\s\S]*?)<<<END_PREDICTION_JSON>>>/
+```
+
+Extracted fields: `homeTeam`, `awayTeam`, `homeScore`, `awayScore`, `confidence` (`low`/`medium`/`high`), `reasoning` (one-sentence summary). The prediction is then stored in the user's Durable Object and tracked for accuracy resolution.
+
+---
+
+### NO-FIXTURE FALLBACK
+
+Used when the user's message doesn't match any upcoming fixture in the system:
+
+```
+USER MESSAGE: "${userMessage}"
+
+(No specific fixture data available. Provide general football analysis. If they're asking about a match you cannot identify, say so and offer general insights based on what you know.)
+
+═══ YOUR TRACK RECORD ═══
+Total: ${totalPredictions} | Outcome: ${outcomeAccuracy}% | Streak: ${currentStreak}
+```

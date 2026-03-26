@@ -1,17 +1,23 @@
 // Chat state management hook — loads persisted history + sends new messages
+// When fixtureId is provided, filters messages to only those for that fixture.
 
 import { useState, useCallback, useEffect } from 'react';
 import type { ChatMessage } from '../types';
 import { sendChat, getChatHistory, type ChatResponseData } from '../services/api';
 
-export function useChat(gameweek: number | null) {
-  const [messages, setMessages] = useState<ChatMessage[]>([]);
+export function useChat(gameweek: number | null, fixtureId?: number) {
+  const [allMessages, setAllMessages] = useState<ChatMessage[]>([]);
   const [loading, setLoading] = useState(false);
   const [historyLoading, setHistoryLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [lastAccuracy, setLastAccuracy] = useState<ChatResponseData['accuracy'] | null>(null);
 
-  // Load persisted chat history when GW changes
+  // Filter messages to current fixture when fixtureId is provided
+  const messages = fixtureId
+    ? allMessages.filter(m => !m.metadata?.fixtureId || m.metadata.fixtureId === fixtureId)
+    : allMessages;
+
+  // Load persisted chat history when GW or fixture changes
   useEffect(() => {
     if (!gameweek) return;
     let cancelled = false;
@@ -21,60 +27,70 @@ export function useChat(gameweek: number | null) {
       try {
         const data = await getChatHistory(gameweek!);
         if (!cancelled && data.messages.length > 0) {
-          setMessages(data.messages);
+          setAllMessages(data.messages);
         }
       } catch (err) {
-        // Silently fail — empty chat is fine
         console.warn('Failed to load chat history:', err);
       } finally {
         if (!cancelled) setHistoryLoading(false);
       }
     }
 
-    // Reset messages when switching GW
-    setMessages([]);
+    setAllMessages([]);
     loadHistory();
     return () => { cancelled = true; };
   }, [gameweek]);
 
-  const send = useCallback(async (message: string, fixtureId?: number) => {
+  const send = useCallback(async (message: string, sendFixtureId?: number) => {
     if (!gameweek || !message.trim()) return;
 
-    // Add user message immediately
+    const activeFixtureId = sendFixtureId ?? fixtureId;
+
+    // Optimistically add user message
     const userMsg: ChatMessage = {
       id: `local_${Date.now()}`,
       role: 'user',
       content: message.trim(),
       timestamp: new Date().toISOString(),
+      metadata: activeFixtureId ? { fixtureId: activeFixtureId } : undefined,
     };
-    setMessages(prev => [...prev, userMsg]);
+    setAllMessages(prev => [...prev, userMsg]);
     setLoading(true);
     setError(null);
 
     try {
-      const data = await sendChat(message.trim(), gameweek, fixtureId);
+      const data = await sendChat(message.trim(), gameweek, activeFixtureId);
 
-      // Add assistant message
       const assistantMsg: ChatMessage = {
         id: `local_${Date.now()}_resp`,
         role: 'assistant',
         content: data.response,
         timestamp: new Date().toISOString(),
+        metadata: activeFixtureId ? { fixtureId: activeFixtureId } : undefined,
         prediction: data.prediction,
       };
-      setMessages(prev => [...prev, assistantMsg]);
+      setAllMessages(prev => [...prev, assistantMsg]);
       setLastAccuracy(data.accuracy);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to get response');
+      // Remove the optimistic message on error
+      setAllMessages(prev => prev.filter(m => m.id !== userMsg.id));
     } finally {
       setLoading(false);
     }
-  }, [gameweek]);
+  }, [gameweek, fixtureId]);
 
   const clearMessages = useCallback(() => {
-    setMessages([]);
+    setAllMessages([]);
     setError(null);
   }, []);
 
-  return { messages, loading, historyLoading, error, lastAccuracy, send, clearMessages };
+  // Returns the fixture IDs that have at least one message in this GW
+  const chattedFixtureIds = new Set(
+    allMessages
+      .map(m => m.metadata?.fixtureId)
+      .filter((id): id is number => id !== undefined)
+  );
+
+  return { messages, allMessages, loading, historyLoading, error, lastAccuracy, send, clearMessages, chattedFixtureIds };
 }

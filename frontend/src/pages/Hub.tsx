@@ -1,9 +1,11 @@
 // Gameweek Hub page
 // Landing page — gameweek-organized view of all fixtures
+// Loads chat history for the active GW to show which fixtures have been discussed
 
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useGameweek } from '../hooks/useGameweek';
+import { useChat } from '../hooks/useChat';
 import { getFixtures, type FixtureData } from '../services/api';
 import FixtureCard from '../components/hub/FixtureCard';
 import GwSelector from '../components/hub/GwSelector';
@@ -16,6 +18,9 @@ export default function Hub() {
   const [fixtures, setFixtures] = useState<FixtureData[]>([]);
   const [fixturesLoading, setFixturesLoading] = useState(false);
   const [selectedFixture, setSelectedFixture] = useState<FixtureData | null>(null);
+
+  // Load chat history for the active GW to power the "hasChatted" badges
+  const { chattedFixtureIds } = useChat(selectedGw);
 
   // Set initial GW when loaded
   useEffect(() => {
@@ -50,13 +55,8 @@ export default function Hub() {
   }, [selectedGw]);
 
   const handleFixtureClick = (fixture: FixtureData) => {
-    // On mobile/tablet: navigate directly to chat
-    if (window.innerWidth < 1200) {
-      navigate(`/chat/${fixture.id}?gw=${selectedGw}`);
-    } else {
-      // On desktop: show in preview panel
-      setSelectedFixture(fixture);
-    }
+    // Navigate to the fixture's chat (or start a new one)
+    navigate(`/chat/${fixture.id}?gw=${selectedGw}`);
   };
 
   if (gwLoading || !selectedGw) {
@@ -98,6 +98,7 @@ export default function Hub() {
                   key={f.id}
                   fixture={f}
                   isSelected={selectedFixture?.id === f.id}
+                  hasChatted={chattedFixtureIds.has(f.id)}
                   onClick={() => handleFixtureClick(f)}
                 />
               ))}

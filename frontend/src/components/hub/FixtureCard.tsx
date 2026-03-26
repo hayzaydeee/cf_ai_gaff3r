@@ -6,10 +6,11 @@ import type { FixtureData } from '../../services/api';
 interface FixtureCardProps {
     fixture: FixtureData;
     isSelected?: boolean;
+    hasChatted?: boolean;
     onClick?: () => void;
 }
 
-export default function FixtureCard({ fixture, isSelected, onClick }: FixtureCardProps) {
+export default function FixtureCard({ fixture, isSelected, hasChatted, onClick }: FixtureCardProps) {
     const kickoff = new Date(fixture.kickoffTime);
     const timeStr = kickoff.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
     const dateStr = kickoff.toLocaleDateString([], { weekday: 'short', day: 'numeric', month: 'short' });
@@ -48,6 +49,11 @@ export default function FixtureCard({ fixture, isSelected, onClick }: FixtureCar
 
             <div className="fixture-card-footer">
                 <span className="fixture-date">{dateStr}</span>
+                {hasChatted && (
+                    <span className="fixture-chatted-badge" title="You've chatted about this fixture">
+                        💬 Chat
+                    </span>
+                )}
             </div>
 
             <style>{`
@@ -129,6 +135,15 @@ export default function FixtureCard({ fixture, isSelected, onClick }: FixtureCar
         .fixture-date {
           font-size: 12px;
           color: var(--color-char-muted);
+        }
+        .fixture-chatted-badge {
+          font-family: var(--font-display);
+          font-size: 11px;
+          font-weight: 600;
+          color: var(--color-orange);
+          background: var(--color-orange-soft);
+          padding: 2px 8px;
+          border-radius: var(--radius-pill);
         }
       `}</style>
         </button>
