@@ -94,6 +94,7 @@ export default function Hub() {
                   isSelected={selectedFixture?.id === f.id}
                   hasChatted={chattedFixtureIds.has(f.id)}
                   onClick={() => handleFixtureClick(f)}
+                  onDoubleClick={() => handleAnalyse(f)}
                 />
               ))}
             </div>
@@ -154,6 +155,8 @@ const hubStyles = `
   .hub-root {
     display: flex;
     min-height: 100vh;
+    box-sizing: border-box;
+    padding-top: 16px;
   }
   .hub-main {
     flex: 1;
@@ -211,7 +214,8 @@ const hubStyles = `
     color: var(--color-char);
   }
   .hub-gw-sub {
-    font-family: var(--font-display);
+    font-family: 'EB Garamond', serif;
+    font-style: italic;
     font-size: 13px;
     color: var(--color-muted);
   }
@@ -238,7 +242,7 @@ const hubStyles = `
   /* ── Right panel ── */
   .hub-right {
     display: none;
-    width: 300px;
+    width: clamp(320px, 25vw, 360px);
     flex-shrink: 0;
   }
   @media (min-width: 1200px) {
@@ -250,6 +254,7 @@ const hubStyles = `
     .hub-root {
       flex-direction: column;
       min-height: unset;
+      padding-top: 0;
     }
     .hub-main { border-right: none; }
     .hub-gw-bar {

@@ -2,13 +2,15 @@
 // Desktop: 3-column (sidebar | chat main | right context panel)
 // Spec: match banner header, structured AI responses, prediction card inline
 
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useParams, useNavigate, useSearchParams, Link } from 'react-router-dom';
 import { useGameweek } from '../hooks/useGameweek';
 import { useChat } from '../hooks/useChat';
+import { getFixtures, type FixtureData } from '../services/api';
 import ChatInput from '../components/chat/ChatInput';
 import MessageBubble from '../components/chat/MessageBubble';
 import MatchContext from '../components/chat/MatchContext';
+import ClubLogo from '../components/common/ClubLogo';
 
 export default function Chat() {
   const { fixtureId: fixtureIdParam } = useParams<{ fixtureId?: string }>();
@@ -20,8 +22,30 @@ export default function Chat() {
   const gwParam = searchParams.get('gw');
   const activeGw = gwParam ? parseInt(gwParam) : currentGw;
 
-  const { messages, loading, error, send } = useChat(activeGw, fixtureId);
+  const { messages, loading, error, send, chattedFixtureIds } = useChat(activeGw, fixtureId);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const [selectedFixture, setSelectedFixture] = useState<FixtureData | null>(null);
+  const [allFixtures, setAllFixtures] = useState<FixtureData[]>([]);
+
+  useEffect(() => {
+    if (!activeGw) return;
+    let cancelled = false;
+
+    getFixtures(activeGw)
+      .then(({ fixtures }) => {
+        if (cancelled) return;
+        setAllFixtures(fixtures);
+        setSelectedFixture(fixtureId ? fixtures.find(f => f.id === fixtureId) ?? null : null);
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setSelectedFixture(null);
+          setAllFixtures([]);
+        }
+      });
+
+    return () => { cancelled = true; };
+  }, [fixtureId, activeGw]);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -41,15 +65,66 @@ export default function Chat() {
     );
   }
 
-  // ── No fixture — redirect to hub ──
+  // ── No fixture — session picker ──
   if (!fixtureId) {
+    const chatted = allFixtures.filter(f => chattedFixtureIds.has(f.id));
+    const fresh = allFixtures.filter(f => !chattedFixtureIds.has(f.id));
+
     return (
-      <div className="chat-no-fixture">
-        <p>Pick a fixture from the <Link to="/">Hub</Link> to start a chat.</p>
+      <div className="chat-picker" id="chat-picker">
+        <h2 className="picker-title">Chat Sessions</h2>
+        <p className="picker-subtitle">GW{activeGw} - pick a fixture to continue or start a new chat</p>
+
+        {chatted.length > 0 && (
+          <section className="picker-section">
+            <h3 className="picker-section-title">Continue a chat</h3>
+            <div className="picker-list">
+              {chatted.map(f => (
+                <FixtureSessionCard
+                  key={f.id}
+                  fixture={f}
+                  hasChat
+                  onClick={() => navigate(`/chat/${f.id}?gw=${activeGw}`)}
+                />
+              ))}
+            </div>
+          </section>
+        )}
+
+        {fresh.length > 0 && (
+          <section className="picker-section">
+            <h3 className="picker-section-title">Start new</h3>
+            <div className="picker-list">
+              {fresh.map(f => (
+                <FixtureSessionCard
+                  key={f.id}
+                  fixture={f}
+                  hasChat={false}
+                  onClick={() => navigate(`/chat/${f.id}?gw=${activeGw}`)}
+                />
+              ))}
+            </div>
+          </section>
+        )}
+
+        {allFixtures.length === 0 && (
+          <div className="picker-empty">
+            <div className="spinner" />
+          </div>
+        )}
+
         <style>{chatStyles}</style>
       </div>
     );
   }
+
+  const kickoffText = selectedFixture
+    ? new Date(selectedFixture.kickoffTime).toLocaleString([], { weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })
+    : `GW${activeGw} · Premier League`;
+
+  const bannerTitle = selectedFixture
+    ? `${selectedFixture.homeTeam} vs ${selectedFixture.awayTeam}`
+    : 'Match Chat';
 
   return (
     <div className="chat-page" id="chat-page">
@@ -60,9 +135,9 @@ export default function Chat() {
           <Link to="/" className="chat-back">←</Link>
           <div className="chat-banner-info">
             <span className="chat-banner-title">
-              Match Chat
+              {bannerTitle}
             </span>
-            <span className="chat-banner-sub">GW{activeGw} · Premier League</span>
+            <span className="chat-banner-sub">{kickoffText}</span>
           </div>
           <Link to={`/?gw=${activeGw}`} className="chat-hub-link">Hub</Link>
         </div>
@@ -120,6 +195,58 @@ export default function Chat() {
   );
 }
 
+function FixtureSessionCard({
+  fixture,
+  hasChat,
+  onClick,
+}: {
+  fixture: FixtureData;
+  hasChat: boolean;
+  onClick: () => void;
+}) {
+  const kickoff = new Date(fixture.kickoffTime);
+  const dateStr = kickoff.toLocaleDateString([], { weekday: 'short', day: 'numeric', month: 'short' });
+  const timeStr = kickoff.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
+  return (
+    <button className={`session-card ${hasChat ? 'session-card-active' : ''}`} onClick={onClick}>
+      <div className="session-card-teams">
+        <ClubLogo
+          teamName={fixture.homeTeam}
+          size={20}
+          className="session-logo"
+          fallbackClassName="session-logo-fallback"
+          refData={{
+            fplTeamId: fixture.homeTeamId,
+            fdTeamId: fixture.homeTeamId,
+            fplShortName: fixture.homeTeamShortName,
+            fdShortName: fixture.homeTeamShortName,
+          }}
+        />
+        <span className="session-team">{fixture.homeTeam}</span>
+        <span className="session-vs">vs</span>
+        <ClubLogo
+          teamName={fixture.awayTeam}
+          size={20}
+          className="session-logo"
+          fallbackClassName="session-logo-fallback"
+          refData={{
+            fplTeamId: fixture.awayTeamId,
+            fdTeamId: fixture.awayTeamId,
+            fplShortName: fixture.awayTeamShortName,
+            fdShortName: fixture.awayTeamShortName,
+          }}
+        />
+        <span className="session-team">{fixture.awayTeam}</span>
+      </div>
+      <div className="session-card-meta">
+        <span className="session-date">{fixture.finished ? 'FT' : `${dateStr} - ${timeStr}`}</span>
+        {hasChat ? <span className="session-badge">Resume</span> : <span className="session-new">New</span>}
+      </div>
+    </button>
+  );
+}
+
 const chatStyles = `
   .chat-loading, .chat-no-fixture {
     display: flex;
@@ -132,15 +259,156 @@ const chatStyles = `
     flex-direction: column;
   }
 
+  .chat-picker {
+    width: min(1120px, 100%);
+    margin: 0 auto;
+    padding: 16px 24px 24px;
+  }
+  .picker-title {
+    font-family: var(--font-display);
+    font-size: 24px;
+    font-weight: 800;
+    margin-bottom: 4px;
+    color: var(--color-char);
+  }
+  .picker-subtitle {
+    color: var(--color-muted);
+    font-size: 15px;
+    margin-bottom: 24px;
+    font-family: 'EB Garamond', serif;
+  }
+  .picker-section {
+    margin-bottom: 24px;
+  }
+  .picker-section-title {
+    font-family: var(--font-display);
+    font-size: 12px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+    color: var(--color-muted);
+    margin-bottom: 10px;
+  }
+  .picker-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  .picker-empty {
+    display: flex;
+    justify-content: center;
+    padding: 40px;
+  }
+  .session-card {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    width: 100%;
+    padding: 16px 18px;
+    background: var(--color-beige);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-lg);
+    cursor: pointer;
+    text-align: left;
+    gap: 12px;
+    transition: all var(--transition-fast);
+  }
+  .session-card:hover {
+    background: var(--color-beige-hover);
+    transform: translateY(-1px);
+  }
+  .session-card-active {
+    border-color: var(--color-orange);
+    background: var(--color-orange-soft);
+  }
+  .session-card-teams {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex: 1;
+    min-width: 0;
+  }
+  .session-team {
+    font-family: var(--font-display);
+    font-size: 15px;
+    font-weight: 700;
+    color: var(--color-char);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .session-vs {
+    font-family: 'EB Garamond', serif;
+    font-size: 12px;
+    color: var(--color-muted);
+    font-style: italic;
+  }
+  .session-logo,
+  .session-logo-fallback {
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+  .session-logo {
+    background: transparent;
+    border: none;
+    padding: 0;
+  }
+  .session-logo-fallback {
+    background: var(--color-orange);
+    color: #FFFFFF;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-family: var(--font-display);
+    font-size: 8px;
+    font-weight: 700;
+  }
+  .session-card-meta {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-shrink: 0;
+  }
+
+  @media (max-width: 767px) {
+    .chat-picker {
+      padding: 16px;
+      width: 100%;
+    }
+  }
+  .session-date {
+    font-family: var(--font-display);
+    font-size: 12px;
+    color: var(--color-char-light);
+  }
+  .session-badge {
+    font-family: var(--font-display);
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--color-orange);
+    background: var(--color-pending-soft);
+    padding: 3px 10px;
+    border-radius: var(--radius-pill);
+  }
+  .session-new {
+    font-family: var(--font-display);
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--color-muted);
+  }
+
   /* ── Full-bleed layout ── */
   .chat-page {
     display: flex;
     height: 100vh;
+    box-sizing: border-box;
+    padding-top: 16px;
   }
   @media (max-width: 1199px) {
     .chat-page {
       height: calc(100vh - 56px);
       margin-top: 0;
+      padding-top: 0;
     }
   }
   @media (max-width: 767px) {
@@ -302,7 +570,7 @@ const chatStyles = `
   /* ── Right context panel ── */
   .chat-ctx-panel {
     display: none;
-    width: 300px;
+    width: 320px;
     flex-shrink: 0;
   }
   @media (min-width: 1200px) {

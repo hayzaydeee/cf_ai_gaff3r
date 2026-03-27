@@ -5,6 +5,11 @@ import { useState, useCallback, useEffect } from 'react';
 import type { ChatMessage } from '../types';
 import { sendChat, getChatHistory, type ChatResponseData } from '../services/api';
 
+export function filterMessagesForFixture(messages: ChatMessage[], fixtureId?: number): ChatMessage[] {
+  if (!fixtureId) return messages;
+  return messages.filter((m) => m.metadata?.fixtureId === fixtureId);
+}
+
 export function useChat(gameweek: number | null, fixtureId?: number) {
   const [allMessages, setAllMessages] = useState<ChatMessage[]>([]);
   const [loading, setLoading] = useState(false);
@@ -12,10 +17,8 @@ export function useChat(gameweek: number | null, fixtureId?: number) {
   const [error, setError] = useState<string | null>(null);
   const [lastAccuracy, setLastAccuracy] = useState<ChatResponseData['accuracy'] | null>(null);
 
-  // Filter messages to current fixture when fixtureId is provided
-  const messages = fixtureId
-    ? allMessages.filter(m => !m.metadata?.fixtureId || m.metadata.fixtureId === fixtureId)
-    : allMessages;
+  // Keep fixture chats isolated when a fixture is selected.
+  const messages = filterMessagesForFixture(allMessages, fixtureId);
 
   // Load persisted chat history when GW or fixture changes
   useEffect(() => {

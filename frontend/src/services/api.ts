@@ -84,6 +84,61 @@ export interface StatsData {
   byGameweek: { gw: number; total: number; correct: number }[];
 }
 
+export interface MatchContextTeamData {
+  name: string;
+  leaguePosition: number;
+  points: number;
+  played: number;
+  won: number;
+  drawn: number;
+  lost: number;
+  goalsFor: number;
+  goalsAgainst: number;
+  goalDifference: number;
+  form: string[];
+  formSummary: string;
+  recentResults: {
+    opponent: string;
+    goalsFor: number;
+    goalsAgainst: number;
+    result: string;
+    home: boolean;
+  }[];
+  keyPlayers?: {
+    name: string;
+    position: string;
+    form: number;
+    goals: number;
+    assists: number;
+    xG: number;
+    xA: number;
+    minutes: number;
+    status: 'available' | 'injured' | 'doubtful' | 'suspended';
+  }[];
+  injuries?: {
+    player: string;
+    status: string;
+    news: string;
+    chanceOfPlaying: number | null;
+  }[];
+}
+
+export interface MatchContextData {
+  fixture: {
+    id: number;
+    homeTeam: string;
+    awayTeam: string;
+    competition: string;
+    competitionCode: string;
+    matchDate: string;
+    matchday?: number;
+  };
+  dataSource: 'fpl' | 'football-data';
+  fplDifficulty?: { home: number; away: number };
+  homeTeam: MatchContextTeamData;
+  awayTeam: MatchContextTeamData;
+}
+
 /**
  * GET /api/gameweek/current
  */
@@ -96,6 +151,18 @@ export function getGameweek(): Promise<GameweekData> {
  */
 export function getFixtures(gw: number): Promise<{ gameweek: number; fixtures: FixtureData[] }> {
   return fetchAPI('/api/fixtures/' + gw);
+}
+
+/**
+ * GET /api/match-context?fixtureId=...&gameweek=...&competitionCode=...
+ */
+export function getMatchContext(fixtureId: number, gameweek: number, competitionCode = 'PL'): Promise<MatchContextData> {
+  const query = new URLSearchParams({
+    fixtureId: String(fixtureId),
+    gameweek: String(gameweek),
+    competitionCode,
+  });
+  return fetchAPI<MatchContextData>(`/api/match-context?${query.toString()}`);
 }
 
 /**

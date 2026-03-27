@@ -2,6 +2,7 @@
 
 import type { Env } from './types/env';
 import { handleGetGameweek, handleGetFixtures, handleGetUpcoming } from './routes/fixtures';
+import { handleGetMatchContext } from './routes/match-context';
 import { handleChat } from './routes/chat';
 import { handleGetPredictions } from './routes/predictions';
 import { handleGetStats, handleResolve } from './routes/stats';
@@ -72,6 +73,11 @@ export default {
 
       if (path === '/api/fixtures/upcoming' && request.method === 'GET') {
         response = await handleGetUpcoming(env);
+        return secured(response, origin);
+      }
+
+      if (path === '/api/match-context' && request.method === 'GET') {
+        response = await handleGetMatchContext(request, env);
         return secured(response, origin);
       }
 

@@ -3,63 +3,27 @@
 // bottom row: KO time · competition · confidence dots · status badge
 
 import type { FixtureData } from '../../services/api';
+import ClubLogo from '../common/ClubLogo';
 
 interface FixtureCardProps {
     fixture: FixtureData;
     isSelected?: boolean;
     hasChatted?: boolean;
     onClick?: () => void;
+    onDoubleClick?: () => void;
 }
 
-// Simple team colour map for the initialled badge circles
-const TEAM_COLORS: Record<string, string> = {
-    'Man City': '#1B4FC4', 'Manchester City': '#1B4FC4',
-    'Arsenal': '#EF0107',
-    'Liverpool': '#C8102E',
-    'Chelsea': '#034694',
-    'Man Utd': '#DA291C', 'Manchester United': '#DA291C',
-    'Spurs': '#132257', 'Tottenham': '#132257', 'Tottenham Hotspur': '#132257',
-    'Newcastle': '#241F20', 'Newcastle United': '#241F20',
-    'Aston Villa': '#670E36',
-    'West Ham': '#7A263A',
-    'Everton': '#274488',
-    'Wolves': '#FDB913', 'Wolverhampton': '#FDB913',
-    'Brighton': '#0057B8',
-    'Fulham': '#FFFFFF',
-    'Brentford': '#E30613',
-    'Crystal Palace': '#1B458F',
-    'Nottm Forest': '#DD0000', 'Nottingham Forest': '#DD0000',
-    'Bournemouth': '#DA291C',
-    'Ipswich': '#0044A9',
-    'Leicester': '#003090',
-    'Southampton': '#D71920',
-};
-
-function getTeamColor(name: string): string {
-    return TEAM_COLORS[name] || '#FA8112';
-}
-
-function getInitials(name: string): string {
-    const parts = name.split(' ');
-    if (parts.length === 1) return name.slice(0, 3).toUpperCase();
-    if (parts.length === 2) return (parts[0][0] + parts[1].slice(0, 2)).toUpperCase();
-    return parts.map(p => p[0]).join('').slice(0, 3).toUpperCase();
-}
-
-function confidenceDots(difficulty: number): string {
-    // Use difficulty (1-5) as a proxy for match interest / prediction confidence shown in hub
-    const filled = Math.max(1, Math.min(5, Math.round(difficulty)));
-    return '● '.repeat(filled).trim() + (filled < 5 ? ' ' + '○ '.repeat(5 - filled).trim() : '');
-}
-
-export default function FixtureCard({ fixture, isSelected, hasChatted, onClick }: FixtureCardProps) {
+export default function FixtureCard({ fixture, isSelected, hasChatted, onClick, onDoubleClick }: FixtureCardProps) {
     const kickoff = new Date(fixture.kickoffTime);
-    const timeStr = fixture.finished ? 'FT' : kickoff.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-
-    const homeColor = getTeamColor(fixture.homeTeam);
-    const awayColor = getTeamColor(fixture.awayTeam);
-    const homeInit = getInitials(fixture.homeTeam);
-    const awayInit = getInitials(fixture.awayTeam);
+    const kickoffLabel = fixture.finished
+      ? 'FT'
+      : kickoff.toLocaleString([], {
+        weekday: 'short',
+        day: '2-digit',
+        month: 'short',
+        hour: '2-digit',
+        minute: '2-digit',
+      });
 
     // Determine badge state
     let badgeText = hasChatted ? 'Analysed' : 'Pending';
@@ -69,25 +33,28 @@ export default function FixtureCard({ fixture, isSelected, hasChatted, onClick }
         badgeClass = 'fc-badge--finished';
     }
 
-    // Visual confidence dots (use average difficulty as proxy)
-    const avgDiff = ((fixture.homeDifficulty || 3) + (fixture.awayDifficulty || 3)) / 2;
-    const dots = confidenceDots(avgDiff);
-
     return (
         <button
             className={`fc ${isSelected ? 'fc--selected' : ''}`}
             onClick={onClick}
+            onDoubleClick={onDoubleClick}
             id={`fixture-${fixture.id}`}
         >
             {/* Team rows */}
             <div className="fc-teams">
                 <div className="fc-team-row">
-                    <div
-                        className="fc-badge-circle"
-                        style={{ background: homeColor, color: homeColor === '#FFFFFF' ? '#333' : '#FFF' }}
-                    >
-                        {homeInit}
-                    </div>
+                  <ClubLogo
+                    teamName={fixture.homeTeam}
+                    size={28}
+                    className="fc-logo"
+                    fallbackClassName="fc-badge-circle"
+                    refData={{
+                      fplTeamId: fixture.homeTeamId,
+                      fdTeamId: fixture.homeTeamId,
+                      fplShortName: fixture.homeTeamShortName,
+                      fdShortName: fixture.homeTeamShortName,
+                    }}
+                  />
                     <span className="fc-team-name">{fixture.homeTeam}</span>
                     {fixture.finished && fixture.homeScore !== null && (
                         <span className="fc-score">{fixture.homeScore}</span>
@@ -95,12 +62,18 @@ export default function FixtureCard({ fixture, isSelected, hasChatted, onClick }
                 </div>
                 <span className="fc-vs">vs</span>
                 <div className="fc-team-row">
-                    <div
-                        className="fc-badge-circle"
-                        style={{ background: awayColor, color: awayColor === '#FFFFFF' ? '#333' : '#FFF' }}
-                    >
-                        {awayInit}
-                    </div>
+                  <ClubLogo
+                    teamName={fixture.awayTeam}
+                    size={28}
+                    className="fc-logo"
+                    fallbackClassName="fc-badge-circle"
+                    refData={{
+                      fplTeamId: fixture.awayTeamId,
+                      fdTeamId: fixture.awayTeamId,
+                      fplShortName: fixture.awayTeamShortName,
+                      fdShortName: fixture.awayTeamShortName,
+                    }}
+                  />
                     <span className="fc-team-name">{fixture.awayTeam}</span>
                     {fixture.finished && fixture.awayScore !== null && (
                         <span className="fc-score">{fixture.awayScore}</span>
@@ -110,9 +83,8 @@ export default function FixtureCard({ fixture, isSelected, hasChatted, onClick }
 
             {/* Bottom meta row */}
             <div className="fc-meta">
-                <span className="fc-time">{timeStr}</span>
-                <span className="fc-comp">· {fixture.competitionCode} ·</span>
-                <span className="fc-dots">{dots}</span>
+              <span className="fc-time">{kickoffLabel}</span>
+              <span className="fc-comp">· {fixture.competitionCode}</span>
                 <span className={`fc-badge ${badgeClass}`}>{badgeText}</span>
             </div>
 
@@ -154,6 +126,8 @@ export default function FixtureCard({ fixture, isSelected, hasChatted, onClick }
           width: 28px;
           height: 28px;
           border-radius: 50%;
+          background: var(--color-orange);
+          color: #FFFFFF;
           display: flex;
           align-items: center;
           justify-content: center;
@@ -161,6 +135,13 @@ export default function FixtureCard({ fixture, isSelected, hasChatted, onClick }
           font-size: 9px;
           font-weight: 700;
           flex-shrink: 0;
+        }
+        .fc-logo {
+          border-radius: 50%;
+          flex-shrink: 0;
+          background: transparent;
+          border: none;
+          padding: 0;
         }
         .fc-team-name {
           font-family: var(--font-display);
@@ -188,7 +169,7 @@ export default function FixtureCard({ fixture, isSelected, hasChatted, onClick }
         .fc-meta {
           display: flex;
           align-items: center;
-          gap: 5px;
+          gap: 8px;
           flex-wrap: wrap;
         }
         .fc-time {
@@ -201,30 +182,24 @@ export default function FixtureCard({ fixture, isSelected, hasChatted, onClick }
           font-size: 11px;
           color: var(--color-muted);
         }
-        .fc-dots {
-          font-size: 7px;
-          color: var(--color-orange);
-          letter-spacing: 1px;
-          flex: 1;
-        }
         .fc-badge {
+          margin-left: auto;
           font-family: var(--font-display);
           font-size: 10px;
-          font-weight: 500;
+          font-weight: 600;
           padding: 2px 8px;
           border-radius: var(--radius-pill);
           white-space: nowrap;
+          border: 1px solid currentColor;
+          background: transparent;
         }
         .fc-badge--pending {
-          background: var(--color-pending-soft);
           color: var(--color-pending);
         }
         .fc-badge--chatted {
-          background: var(--color-success-soft);
           color: var(--color-success);
         }
         .fc-badge--finished {
-          background: var(--color-beige);
           color: var(--color-char-muted);
         }
       `}</style>

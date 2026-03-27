@@ -45,6 +45,8 @@ export interface FixtureItem {
   awayTeam: string;
   homeTeamId: number;
   awayTeamId: number;
+  homeTeamShortName?: string;
+  awayTeamShortName?: string;
   kickoffTime: string;
   homeDifficulty: number;
   awayDifficulty: number;
@@ -74,6 +76,40 @@ export interface StatsResponse {
   currentStreak: number;
   bestStreak: number;
   byGameweek: { gw: number; total: number; correct: number }[];
+}
+
+export interface MatchContextTeamItem {
+  name: string;
+  leaguePosition: number;
+  points: number;
+  played: number;
+  won: number;
+  drawn: number;
+  lost: number;
+  goalsFor: number;
+  goalsAgainst: number;
+  goalDifference: number;
+  form: string[];
+  formSummary: string;
+  recentResults: import('./app').RecentResult[];
+  keyPlayers?: import('./app').KeyPlayer[];
+  injuries?: import('./app').InjuryReport[];
+}
+
+export interface MatchContextResponse {
+  fixture: {
+    id: number;
+    homeTeam: string;
+    awayTeam: string;
+    competition: string;
+    competitionCode: string;
+    matchDate: string;
+    matchday?: number;
+  };
+  dataSource: 'fpl' | 'football-data';
+  fplDifficulty?: { home: number; away: number };
+  homeTeam: MatchContextTeamItem;
+  awayTeam: MatchContextTeamItem;
 }
 
 export interface ErrorResponse {

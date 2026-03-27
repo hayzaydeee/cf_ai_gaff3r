@@ -2,23 +2,23 @@
 
 @theme {
   /* Fonts */
-  --font-display: 'League Spartan', sans-serif;
+  --font-display: 'Bricolage Grotesque', sans-serif;
   --font-body: 'EB Garamond', serif;
 
   /* Colors — light mode base */
   --color-cream: #FAF3E1;
   --color-beige: #F5E7C6;
   --color-beige-hover: #EFE0B8;
-  --color-orange: #FA8112;
-  --color-orange-hover: #E5740F;
-  --color-orange-soft: #FA811220;
-  --color-char: #2D2421;
-  --color-char-light: #5C4F49;
-  --color-char-muted: #8A7D76;
+  --color-orange: #D76706;
+  --color-orange-hover: #B95600;
+  --color-orange-soft: #D7670624;
+  --color-char: #241B16;
+  --color-char-light: #463932;
+  --color-char-muted: #6D5D54;
 
   /* Border & muted text */
   --color-border: #E8D9BB;
-  --color-muted: #8A6A55;
+  --color-muted: #775542;
 
   /* Semantic */
   --color-success: #2E7D32;
@@ -99,17 +99,19 @@ a:hover {
 
 /* Dark mode overrides */
 [data-theme="dark"] {
-  --color-cream: #2D2421;
-  --color-beige: #3D3330;
-  --color-beige-hover: #4D433F;
+  --color-cream: #221914;
+  --color-beige: #312621;
+  --color-beige-hover: #3C2F29;
+  --color-border: #5D4A3F;
+  --color-muted: #D1A07D;
   --color-char: #FAF3E1;
-  --color-char-light: #D4C8B8;
-  --color-char-muted: #A89888;
+  --color-char-light: #E4D4C4;
+  --color-char-muted: #B99F8A;
   --color-success: #66BB6A;
   --color-success-soft: #66BB6A20;
   --color-error: #EF5350;
   --color-error-soft: #EF535020;
-  --color-orange-soft: #FA811230;
+  --color-orange-soft: #D767063A;
 }
 
 /* Page transition */

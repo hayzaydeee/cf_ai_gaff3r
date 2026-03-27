@@ -87,7 +87,9 @@ async function callModel(
  */
 export function extractPrediction(response: string): PredictionData | null {
   const match = response.match(/<<<PREDICTION_JSON>>>([\s\S]*?)<<<END_PREDICTION_JSON>>>/);
-  if (!match) return null;
+  if (!match) {
+    return extractPredictionFromText(response);
+  }
 
   try {
     const parsed = JSON.parse(match[1].trim());
@@ -114,8 +116,45 @@ export function extractPrediction(response: string): PredictionData | null {
     };
   } catch (err) {
     console.warn('Failed to parse prediction JSON:', err);
+    return extractPredictionFromText(response);
+  }
+}
+
+function normalizeTeamName(name: string): string {
+  return name
+    .replace(/^[^A-Za-z0-9]+|[^A-Za-z0-9]+$/g, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function extractPredictionFromText(response: string): PredictionData | null {
+  const normalized = response
+    .replace(/\*\*(.+?)\*\*/g, '$1')
+    .replace(/[\u2013\u2014]/g, '-');
+
+  const scorelineMatch = normalized.match(/([A-Za-z][A-Za-z .'-]{1,40}?)\s+(\d{1,2})\s*-\s*(\d{1,2})\s+([A-Za-z][A-Za-z .'-]{1,40})/);
+  if (!scorelineMatch) return null;
+
+  const homeTeam = normalizeTeamName(scorelineMatch[1]);
+  const awayTeam = normalizeTeamName(scorelineMatch[4]);
+  const homeScore = Number.parseInt(scorelineMatch[2], 10);
+  const awayScore = Number.parseInt(scorelineMatch[3], 10);
+
+  const confMatch = normalized.match(/confidence\s*[:\-]\s*(low|medium|high)/i);
+  const confidence = (confMatch?.[1]?.toLowerCase() ?? 'medium') as Confidence;
+
+  if (!homeTeam || !awayTeam || Number.isNaN(homeScore) || Number.isNaN(awayScore)) {
     return null;
   }
+
+  return {
+    homeTeam,
+    awayTeam,
+    homeScore,
+    awayScore,
+    confidence,
+    reasoning: 'Extracted from response text.',
+  };
 }
 
 /**

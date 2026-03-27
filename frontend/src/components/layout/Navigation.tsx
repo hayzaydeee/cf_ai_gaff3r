@@ -147,7 +147,7 @@ export default function Navigation() {
                 <div className="nav-desktop-footer">
                     <button onClick={toggleTheme} className="nav-theme-btn-full" id="desktop-theme-toggle">
                         {theme === 'light' ? <MoonIcon /> : <SunIcon />}
-                        <span>{theme === 'light' ? 'Dark mode' : 'Light mode'}</span>
+                    <span>{theme === 'light' ? 'Dark Mode' : 'Light Mode'}</span>
                     </button>
                 </div>
             </nav>

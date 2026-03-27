@@ -7,6 +7,8 @@ export interface Fixture {
   awayTeam: string;
   homeTeamId: number;
   awayTeamId: number;
+  homeTeamShortName?: string;
+  awayTeamShortName?: string;
   kickoffTime: string;
   homeDifficulty: number;
   awayDifficulty: number;
@@ -43,6 +45,8 @@ export interface Prediction {
   status: 'pending' | 'resolved';
   homeTeam: string;
   awayTeam: string;
+  homeTeamId?: number;
+  awayTeamId?: number;
   predictedScore: { home: number; away: number };
   predictedOutcome: 'home' | 'draw' | 'away';
   confidence: 'low' | 'medium' | 'high';

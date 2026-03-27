@@ -2,6 +2,7 @@
 // Label · Confidence badge · Score line · Outcome sub-text
 
 import type { PredictionSummary } from '../../types';
+import ClubLogo from '../common/ClubLogo';
 
 interface PredictionCardProps {
     prediction: PredictionSummary;
@@ -24,7 +25,21 @@ export default function PredictionCard({ prediction }: PredictionCardProps) {
             </div>
 
             <div className="pc-score">
-                {prediction.homeTeam} {prediction.predictedScore.home} – {prediction.predictedScore.away} {prediction.awayTeam}
+                <span className="pc-score-line">
+                  <ClubLogo
+                    teamName={prediction.homeTeam}
+                    size={20}
+                    className="pc-logo"
+                    fallbackClassName="pc-logo-fallback"
+                  />
+                  {prediction.homeTeam} {prediction.predictedScore.home} – {prediction.predictedScore.away} {prediction.awayTeam}
+                  <ClubLogo
+                    teamName={prediction.awayTeam}
+                    size={20}
+                    className="pc-logo"
+                    fallbackClassName="pc-logo-fallback"
+                  />
+                </span>
             </div>
 
             {prediction.reasoning && (
@@ -81,6 +96,32 @@ export default function PredictionCard({ prediction }: PredictionCardProps) {
           color: var(--color-char);
           margin-bottom: 6px;
           line-height: 1.2;
+        }
+        .pc-score-line {
+          display: inline-flex;
+          align-items: center;
+          gap: 6px;
+          flex-wrap: wrap;
+        }
+        .pc-logo,
+        .pc-logo-fallback {
+          border-radius: 50%;
+          flex-shrink: 0;
+        }
+        .pc-logo {
+          background: transparent;
+          border: none;
+          padding: 0;
+        }
+        .pc-logo-fallback {
+          background: var(--color-orange);
+          color: #FFFFFF;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          font-family: var(--font-display);
+          font-size: 7px;
+          font-weight: 700;
         }
         .pc-desc {
           font-family: 'EB Garamond', serif;

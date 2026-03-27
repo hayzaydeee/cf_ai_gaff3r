@@ -4,6 +4,7 @@
 import { useState, useEffect } from 'react';
 import { getPredictions, resolvePredictions, type PredictionsData } from '../services/api';
 import type { Prediction } from '../types';
+import GwAccordion from '../components/predictions/GwAccordion';
 
 type Filter = 'all' | 'correct' | 'wrong' | 'pending';
 
@@ -132,69 +133,16 @@ export default function Predictions() {
                             </tr>
                         </thead>
                         <tbody>
-                            {gameweeks.map(([gw, preds]) => {
-                                const filtered = preds.filter(filterFn);
-                                if (filtered.length === 0) return null;
-
-                                const gwNum = parseInt(gw.replace('gw', ''));
-                                const resolved = preds.filter(p => p.status === 'resolved');
-                                const correct = resolved.filter(p => p.outcomeCorrect).length;
-                                const pct = resolved.length > 0
-                                    ? Math.round((correct / resolved.length) * 100)
-                                    : null;
-
-                                return [
-                                    /* GW group row */
-                                    <tr key={`gw-${gw}`} className="preds-gw-row">
-                                        <td colSpan={6}>
-                                            <span className="preds-gw-label">Gameweek {gwNum}</span>
-                                            {pct !== null && (
-                                                <span className="preds-gw-stat">
-                                                    {correct}/{resolved.length} correct · {pct}%
-                                                </span>
-                                            )}
-                                        </td>
-                                    </tr>,
-                                    /* Prediction rows */
-                                    ...filtered.map(pred => {
-                                        const rb = resultLabel(pred);
-                                        const kickoff = new Date(pred.createdAt);
-                                        const dateStr = kickoff.toLocaleDateString([], { day: 'numeric', month: 'short' });
-
-                                        return (
-                                            <tr key={pred.id} className="preds-row">
-                                                <td>
-                                                    <div className="preds-fixture-main">{pred.homeTeam} vs {pred.awayTeam}</div>
-                                                    <div className="preds-fixture-sub">GW{gwNum} · {dateStr}</div>
-                                                </td>
-                                                <td className="preds-th-hide-sm">
-                                                    <span className="preds-comp-badge">PL</span>
-                                                </td>
-                                                <td>
-                                                    <div className="preds-score-call">
-                                                        {pred.homeTeam.split(' ')[0]} {pred.predictedScore.home}–{pred.predictedScore.away} {pred.awayTeam.split(' ')[0]}
-                                                    </div>
-                                                    <div className="preds-conf-sub">{confLabel(pred.confidence)} confidence</div>
-                                                </td>
-                                                <td className="preds-th-hide-sm">
-                                                    {pred.actualScore
-                                                        ? <span className="preds-score-actual">
-                                                            {pred.homeTeam.split(' ')[0]} {pred.actualScore.home}–{pred.actualScore.away} {pred.awayTeam.split(' ')[0]}
-                                                          </span>
-                                                        : <span className="preds-score-na">—</span>
-                                                    }
-                                                </td>
-                                                <td>
-                                                    <span className={`preds-result-badge ${rb.cls}`}>{rb.text}</span>
-                                                </td>
-                                                <td className="preds-th-hide-sm">
-                                                    <span className="preds-conf-badge">{confLabel(pred.confidence)}</span>
-                                                </td>
-                                            </tr>
-                                        );
-                                    })
-                                ];
-                            })}
+                          {gameweeks.map(([gw, preds]) => (
+                            <GwAccordion
+                              key={gw}
+                              gameweek={gw}
+                              predictions={preds}
+                              filterFn={filterFn}
+                              resultLabel={resultLabel}
+                              confLabel={confLabel}
+                            />
+                          ))}
                         </tbody>
                     </table>
                 )}
@@ -213,14 +161,14 @@ const predsStyles = `
     min-height: 50vh;
   }
   .preds-page {
-    padding: 28px 32px;
+    padding: 16px 32px 24px;
     max-width: 1100px;
   }
   @media (max-width: 1199px) {
-    .preds-page { padding: 20px; }
+    .preds-page { padding: 16px 20px 20px; }
   }
   @media (max-width: 767px) {
-    .preds-page { padding: 16px; }
+    .preds-page { padding: 16px 16px 20px; }
   }
 
   /* Header */
@@ -342,9 +290,39 @@ const predsStyles = `
   /* Prediction row */
   .preds-row:hover td { background: var(--color-beige); }
   .preds-fixture-main {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
     font-size: 14px;
     font-weight: 600;
     color: var(--color-char);
+  }
+  .preds-fixture-vs {
+    font-family: 'EB Garamond', serif;
+    font-size: 12px;
+    font-style: italic;
+    color: var(--color-muted);
+    margin: 0 2px;
+  }
+  .preds-logo,
+  .preds-logo-fallback {
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+  .preds-logo {
+    background: transparent;
+    border: none;
+    padding: 0;
+  }
+  .preds-logo-fallback {
+    background: var(--color-orange);
+    color: #FFFFFF;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-family: var(--font-display);
+    font-size: 7px;
+    font-weight: 700;
   }
   .preds-fixture-sub {
     font-family: 'EB Garamond', serif;

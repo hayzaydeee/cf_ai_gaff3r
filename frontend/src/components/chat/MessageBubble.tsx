@@ -14,39 +14,66 @@ interface Section {
     body: string;
 }
 
-// Parse assistant response into named sections if structured
-// Detects: "**Section Name**\nContent" or "## Section Name\nContent"
-function parseSections(content: string): Section[] | null {
-    // Try "**Header**\nBody" pattern (most common from AI)
-    const boldPattern = /\*\*([^*]+)\*\*\n([\s\S]*?)(?=\*\*[^*]+\*\*|$)/g;
-    const hashPattern = /^##\s+(.+)$/gm;
+const CANONICAL_SECTIONS: Record<string, string> = {
+  'the gaffers call': "The Gaffer's Call",
+  'the gaffer call': "The Gaffer's Call",
+  'form check': 'Form Check',
+  'key factor': 'Key Factor',
+  prediction: 'Prediction',
+};
 
-    // Count headers
-    const boldMatches = [...content.matchAll(boldPattern)];
-    const hashMatches = [...content.matchAll(hashPattern)];
+function normalizeHeader(header: string): string {
+  return header.toLowerCase().replace(/[^a-z\s]/g, '').replace(/\s+/g, ' ').trim();
+}
 
-    if (boldMatches.length >= 2) {
-        return boldMatches.map(m => ({
-            header: m[1].trim(),
-            body: m[2].trim(),
-        })).filter(s => s.body.length > 0);
-    }
+function toDisplayHeader(header: string): string {
+  return CANONICAL_SECTIONS[normalizeHeader(header)] ?? header.trim();
+}
 
-    if (hashMatches.length >= 2) {
-        // Split by ## headers
-        const parts = content.split(/^##\s+.+$/m).slice(1);
-        return hashMatches.map((m, i) => ({
-            header: m[1].trim(),
-            body: (parts[i] ?? '').trim(),
-        })).filter(s => s.body.length > 0);
-    }
+function stripMarkdownEmphasis(text: string): string {
+  return text
+    .replace(/\*\*(.+?)\*\*/g, '$1')
+    .replace(/\*(.+?)\*/g, '$1')
+    .trim();
+}
 
-    return null; // no structured sections — render as plain text
+function collectSections(content: string, pattern: RegExp): Section[] {
+  const matches = [...content.matchAll(pattern)];
+  if (matches.length < 2) return [];
+
+  return matches.map((m, i) => {
+    const header = (m[1] ?? '').trim().replace(/:+$/, '').trim();
+    const inlineBody = (m[2] ?? '').trim();
+    const start = (m.index ?? 0) + m[0].length;
+    const end = i + 1 < matches.length ? (matches[i + 1].index ?? content.length) : content.length;
+    const trailingBody = content.slice(start, end).trim();
+    const body = [inlineBody, trailingBody].filter(Boolean).join(inlineBody && trailingBody ? '\n' : '');
+
+    return {
+      header,
+      body: stripMarkdownEmphasis(body),
+    };
+  }).filter(s => s.body.length > 0);
+}
+
+// Parse assistant response into named sections if structured.
+// Detects: "**Section Name**: Content", "**Section Name**\nContent", and "## Section Name" variants.
+export function parseAssistantSections(content: string): Section[] | null {
+  const boldHeaderPattern = /^\s*\*\*([^*]+)\*\*:?\s*(.*)$/gm;
+  const hashHeaderPattern = /^\s*##\s+(.+?)\s*:?[ \t]*(.*)$/gm;
+
+  const boldSections = collectSections(content, boldHeaderPattern);
+  if (boldSections.length >= 2) return boldSections;
+
+  const hashSections = collectSections(content, hashHeaderPattern);
+  if (hashSections.length >= 2) return hashSections;
+
+  return null;
 }
 
 export default function MessageBubble({ message }: MessageBubbleProps) {
     const isUser = message.role === 'user';
-    const sections = !isUser ? parseSections(message.content) : null;
+  const sections = !isUser ? parseAssistantSections(message.content) : null;
 
     return (
         <div className={`msg-wrap ${isUser ? 'msg-wrap--user' : 'msg-wrap--ai'}`}>
@@ -58,8 +85,8 @@ export default function MessageBubble({ message }: MessageBubbleProps) {
                     <div className="msg-sections">
                         {sections.map((s, i) => (
                             <div key={i} className="msg-section">
-                                <span className="msg-section-hdr">{s.header}</span>
-                                <p className="msg-section-body">{s.body}</p>
+                            <span className="msg-section-chip">{toDisplayHeader(s.header)}</span>
+                              <p className="msg-section-body">{stripMarkdownEmphasis(s.body)}</p>
                             </div>
                         ))}
                     </div>
@@ -67,7 +94,7 @@ export default function MessageBubble({ message }: MessageBubbleProps) {
                     /* Plain text */
                     <div className="msg-content">
                         {message.content.split('\n').map((line, i) => (
-                            <p key={i} className="msg-line">{line || '\u00A0'}</p>
+                            <p key={i} className="msg-line">{stripMarkdownEmphasis(line) || '\u00A0'}</p>
                         ))}
                     </div>
                 )}
@@ -133,15 +160,20 @@ export default function MessageBubble({ message }: MessageBubbleProps) {
           gap: 10px;
         }
         .msg-section {}
-        .msg-section-hdr {
-          display: block;
+        .msg-section-chip {
+          display: inline-flex;
+          align-items: center;
           font-family: var(--font-display);
-          font-size: 11px;
+          font-size: 12px;
           font-weight: 700;
           text-transform: uppercase;
           letter-spacing: 0.8px;
           color: var(--color-orange);
-          margin-bottom: 4px;
+          background: transparent;
+          border: 1px solid var(--color-border);
+          border-radius: var(--radius-pill);
+          padding: 2px 10px;
+          margin-bottom: 6px;
         }
         .msg-section-body {
           font-family: 'EB Garamond', serif;

@@ -8,44 +8,57 @@ export default function AccuracyChart({ data }: AccuracyChartProps) {
     // Only render with sufficient data
     if (data.length < 3) return null;
 
-    const maxTotal = Math.max(...data.map(d => d.total), 1);
-    const barWidth = Math.min(40, Math.floor(500 / data.length) - 8);
-    const chartWidth = data.length * (barWidth + 8) + 40;
-    const chartHeight = 200;
-    const paddingBottom = 30;
-    const paddingTop = 10;
+    const maxPct = 100;
+    const barWidth = Math.min(42, Math.floor(560 / data.length) - 8);
+    const chartWidth = data.length * (barWidth + 12) + 40;
+    const chartHeight = 240;
+    const paddingBottom = 34;
+    const paddingTop = 16;
     const usableHeight = chartHeight - paddingBottom - paddingTop;
+    const averagePct = Math.round(
+        data.reduce((sum, d) => sum + (d.total > 0 ? (d.correct / d.total) * 100 : 0), 0) / data.length
+    );
+    const avgY = paddingTop + usableHeight - (averagePct / maxPct) * usableHeight;
 
     return (
         <div className="accuracy-chart" id="accuracy-chart">
-            <h3 className="chart-title">Accuracy by Gameweek</h3>
+            <h3 className="chart-title">Accuracy Over Time</h3>
             <div className="chart-scroll">
                 <svg width={chartWidth} height={chartHeight} viewBox={`0 0 ${chartWidth} ${chartHeight}`}>
+                    <line
+                        x1="16"
+                        y1={avgY}
+                        x2={chartWidth - 12}
+                        y2={avgY}
+                        stroke="var(--color-muted)"
+                        strokeDasharray="5 4"
+                        strokeWidth="1"
+                    />
+                    <text
+                        x={chartWidth - 14}
+                        y={avgY - 6}
+                        textAnchor="end"
+                        fill="var(--color-muted)"
+                        fontSize="10"
+                        fontFamily="var(--font-display)"
+                        fontWeight="600"
+                    >
+                        Avg {averagePct}%
+                    </text>
                     {/* Bars */}
                     {data.map((d, i) => {
                         const x = 20 + i * (barWidth + 8);
-                        const totalHeight = (d.total / maxTotal) * usableHeight;
-                        const correctHeight = (d.correct / maxTotal) * usableHeight;
-                        const y = paddingTop + usableHeight - totalHeight;
-                        const yCorrect = paddingTop + usableHeight - correctHeight;
+                        const pct = d.total > 0 ? Math.round((d.correct / d.total) * 100) : 0;
+                        const barHeight = (pct / maxPct) * usableHeight;
+                        const y = paddingTop + usableHeight - barHeight;
 
                         return (
                             <g key={d.gw}>
-                                {/* Total bar (background) */}
                                 <rect
                                     x={x}
                                     y={y}
                                     width={barWidth}
-                                    height={totalHeight}
-                                    rx={4}
-                                    fill="var(--color-beige-hover)"
-                                />
-                                {/* Correct bar (foreground) */}
-                                <rect
-                                    x={x}
-                                    y={yCorrect}
-                                    width={barWidth}
-                                    height={correctHeight}
+                                    height={barHeight}
                                     rx={4}
                                     fill="var(--color-orange)"
                                 />
@@ -59,7 +72,7 @@ export default function AccuracyChart({ data }: AccuracyChartProps) {
                                     fontFamily="var(--font-display)"
                                     fontWeight="600"
                                 >
-                                    {d.gw}
+                                    GW{d.gw}
                                 </text>
                                 {/* Accuracy label */}
                                 <text
@@ -71,23 +84,12 @@ export default function AccuracyChart({ data }: AccuracyChartProps) {
                                     fontFamily="var(--font-display)"
                                     fontWeight="600"
                                 >
-                                    {d.total > 0 ? Math.round((d.correct / d.total) * 100) + '%' : ''}
+                                    {pct}%
                                 </text>
                             </g>
                         );
                     })}
                 </svg>
-            </div>
-
-            <div className="chart-legend">
-                <span className="chart-legend-item">
-                    <span className="chart-legend-dot" style={{ background: 'var(--color-orange)' }} />
-                    Correct
-                </span>
-                <span className="chart-legend-item">
-                    <span className="chart-legend-dot" style={{ background: 'var(--color-beige-hover)' }} />
-                    Total
-                </span>
             </div>
 
             <style>{`
@@ -105,26 +107,6 @@ export default function AccuracyChart({ data }: AccuracyChartProps) {
         }
         .chart-scroll {
           overflow-x: auto;
-        }
-        .chart-legend {
-          display: flex;
-          gap: 16px;
-          margin-top: 8px;
-          justify-content: center;
-        }
-        .chart-legend-item {
-          display: flex;
-          align-items: center;
-          gap: 6px;
-          font-family: var(--font-display);
-          font-size: 12px;
-          font-weight: 500;
-          color: var(--color-char-light);
-        }
-        .chart-legend-dot {
-          width: 10px;
-          height: 10px;
-          border-radius: 3px;
         }
       `}</style>
         </div>

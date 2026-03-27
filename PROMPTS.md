@@ -13,15 +13,13 @@ PROMPT 1
 - All work must be original
 **The concept:**
 An AI match analyst you chat with about upcoming football (soccer) matches. You ask about a fixture (e.g. "Arsenal vs Chelsea this weekend"), and the AI reasons about form, head-to-head record, league position, injuries, and gives a scoreline prediction with reasoning. Durable Objects store your prediction history and track your accuracy over time as real results come in. The app should feel like talking to a knowledgeable football pundit.
-**My tech background:**
-I build with TypeScript, React, Node.js, Express, MongoDB. I've built predictionsLeague (predictionsleague.xyz), a fantasy football prediction game with real-time leaderboards and a custom scoring engine, so I'm familiar with football data and scoring logic. I've also integrated the OpenAI API in a previous project (umber). I have NOT used Cloudflare Workers, Durable Objects, or Workers AI before — I need to learn these.
+**My background:**
+I build with TypeScript, React, Node.js, Express, MongoDB. I've built predictionsLeague (predictionsleague.xyz), a fantasy football prediction game with real-time leaderboards and a custom scoring engine, so I'm familiar with football data and scoring logic.
 **What I need from you:**
 1. Architecture plan — how each Cloudflare component maps to each requirement
-2. Data strategy — where match/form data comes from (free APIs like football-data.org, API-Football, etc.)
-3. Step-by-step build plan I can follow over a weekend
-4. The Durable Objects state schema for prediction history and accuracy tracking
-5. A clean chat UI approach using Cloudflare Pages
-6. How to structure the LLM prompts so the AI gives reasoned, specific predictions rather than generic responses.
+2. The Durable Objects state schema for prediction history and accuracy tracking
+3. A clean chat UI approach using Cloudflare Pages
+4. How to structure the LLM prompts so the AI gives reasoned, specific predictions rather than generic responses; we can fine-tune the strategy as we test and iterate
 "
 
 PROMPT 2
@@ -47,6 +45,10 @@ PROMPT 6
 PROMPT 7
 
 "have we implemented all necessary standard and specific security measures accross the app, as we get ready for prod deployment and internship submission?"
+
+PROMPT 8
+
+"i've provided club logos within /assets. create appropriate hooks and team mappings, either by name or id to fetch them for rendering within the app, wherever the clubs are referenced. make sure the sizing is suitable, and the mappings for retrieval have different fallbacks, i.e if name, shortname or id isnt available from FPL data, we fall back on football-data.org responses"
 ---
 
 ## Application AI Prompts

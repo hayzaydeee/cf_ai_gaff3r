@@ -127,7 +127,9 @@ export async function handleChat(
     role: 'assistant',
     content: aiResult.response,
     timestamp: new Date().toISOString(),
-    metadata: predictionId ? { fixtureId: resolvedFixtureId, predictionId } : undefined,
+    metadata: (resolvedFixtureId || predictionId)
+      ? { fixtureId: resolvedFixtureId, predictionId }
+      : undefined,
   };
 
   await doStub.fetch(new Request(`http://do/chat/${gameweek}`, {

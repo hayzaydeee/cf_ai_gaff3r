@@ -1,8 +1,11 @@
 // Desktop-only right panel — shows match preview for selected fixture
 // Redesigned per spec: "Match Preview" label, title, date line, Quick Stats, FPL Difficulty, CTA
 
-import type { FixtureData } from '../../services/api';
+import { useEffect, useState } from 'react';
+import type { FixtureData, MatchContextData } from '../../services/api';
+import { getMatchContext } from '../../services/api';
 import { useNavigate } from 'react-router-dom';
+import ClubLogo from '../common/ClubLogo';
 
 interface FixturePreviewProps {
   fixture: FixtureData | null;
@@ -10,26 +13,73 @@ interface FixturePreviewProps {
 }
 
 function DiffDot({ filled }: { filled: boolean }) {
-    return (
-        <span style={{
-            display: 'inline-block',
-            width: 8, height: 8,
-            borderRadius: '50%',
-            background: filled ? 'var(--color-orange)' : 'var(--color-border)',
-            marginRight: 3,
-        }} />
-    );
+  return (
+    <span
+      style={{
+        display: 'inline-block',
+        width: 8,
+        height: 8,
+        borderRadius: '50%',
+        background: filled ? 'var(--color-orange)' : 'var(--color-border)',
+        marginRight: 3,
+      }}
+    />
+  );
+}
+
+function formDisplay(form: string[]): string {
+  if (!form.length) return '— — — — —';
+  return form.slice(0, 5).map((r) => r.toUpperCase()).join(' ');
 }
 
 export default function FixturePreview({ fixture, gameweek }: FixturePreviewProps) {
   const navigate = useNavigate();
+  const [context, setContext] = useState<MatchContextData | null>(null);
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    if (!fixture || !gameweek) {
+      setContext(null);
+      return () => {
+        cancelled = true;
+      };
+    }
+
+    setLoading(true);
+    getMatchContext(fixture.id, gameweek, fixture.competitionCode || 'PL')
+      .then((data) => {
+        if (!cancelled) {
+          setContext(data);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setContext(null);
+        }
+      })
+      .finally(() => {
+        if (!cancelled) {
+          setLoading(false);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [fixture, gameweek]);
 
   if (!fixture) {
     return (
       <div className="fp fp-empty" id="fixture-preview">
         <div className="fp-empty-inner">
           <div className="fp-empty-icon">⚽</div>
-          <p className="fp-empty-hint">Select a fixture<br />to see a preview</p>
+          <p className="fp-empty-hint">
+            Select a fixture
+            <br />
+            to see a preview
+          </p>
         </div>
         <style>{fpStyles}</style>
       </div>
@@ -39,13 +89,24 @@ export default function FixturePreview({ fixture, gameweek }: FixturePreviewProp
   const kickoff = new Date(fixture.kickoffTime);
   const dateStr = kickoff.toLocaleDateString([], { weekday: 'short', day: 'numeric', month: 'short' });
   const timeStr = fixture.finished ? 'FT' : kickoff.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-  const diffRating = Math.round(((fixture.homeDifficulty || 3) + (fixture.awayDifficulty || 3)) / 2);
+  const diffRating = context?.fplDifficulty
+    ? Math.round((context.fplDifficulty.home + context.fplDifficulty.away) / 2)
+    : Math.round(((fixture.homeDifficulty || 3) + (fixture.awayDifficulty || 3)) / 2);
+
+  const homeTable = context
+    ? `#${context.homeTeam.leaguePosition} · ${context.homeTeam.points} pts`
+    : 'No table data';
+  const awayTable = context
+    ? `#${context.awayTeam.leaguePosition} · ${context.awayTeam.points} pts`
+    : 'No table data';
 
   return (
     <div className="fp" id="fixture-preview">
-      <div className="fp-label">Match Preview</div>
+      <div className="fp-label">MATCH PREVIEW</div>
 
-      <h3 className="fp-title">{fixture.homeTeam} vs {fixture.awayTeam}</h3>
+      <h3 className="fp-title">
+        {fixture.homeTeam} vs {fixture.awayTeam}
+      </h3>
       <p className="fp-sub">
         {dateStr} · {timeStr}
         {fixture.competition ? ` · ${fixture.competition}` : ''}
@@ -54,27 +115,64 @@ export default function FixturePreview({ fixture, gameweek }: FixturePreviewProp
       <div className="fp-divider" />
 
       <div className="fp-section-label">Quick Stats</div>
-      <div className="fp-stats">
-        <div className="fp-stat-row">
-          <span className="fp-stat-key">Home Form</span>
-          <span className="fp-stat-val">W W D L W</span>
-        </div>
-        <div className="fp-stat-row">
-          <span className="fp-stat-key">Away Form</span>
-          <span className="fp-stat-val">W L W W D</span>
-        </div>
-        <div className="fp-stat-row">
-          <span className="fp-stat-key">H2H (last 5)</span>
-          <span className="fp-stat-val fp-stat-small">—</span>
-        </div>
+      <div className="fp-matchup">
+        <ClubLogo
+          teamName={fixture.homeTeam}
+          size={48}
+          className="fp-team-logo"
+          fallbackClassName="fp-team-badge"
+          refData={{
+            fplTeamId: fixture.homeTeamId,
+            fdTeamId: fixture.homeTeamId,
+            fplShortName: fixture.homeTeamShortName,
+            fdShortName: fixture.homeTeamShortName,
+          }}
+        />
+        <span className="fp-matchup-vs">vs</span>
+        <ClubLogo
+          teamName={fixture.awayTeam}
+          size={48}
+          className="fp-team-logo"
+          fallbackClassName="fp-team-badge"
+          refData={{
+            fplTeamId: fixture.awayTeamId,
+            fdTeamId: fixture.awayTeamId,
+            fplShortName: fixture.awayTeamShortName,
+            fdShortName: fixture.awayTeamShortName,
+          }}
+        />
       </div>
+      {loading ? (
+        <div className="fp-loading">Loading live context...</div>
+      ) : (
+        <div className="fp-stats">
+          <div className="fp-stat-row">
+            <span className="fp-stat-key">Home Form</span>
+            <span className="fp-stat-val">{formDisplay(context?.homeTeam.form ?? [])}</span>
+          </div>
+          <div className="fp-stat-row">
+            <span className="fp-stat-key">Away Form</span>
+            <span className="fp-stat-val">{formDisplay(context?.awayTeam.form ?? [])}</span>
+          </div>
+          <div className="fp-stat-row">
+            <span className="fp-stat-key">Home Table</span>
+            <span className="fp-stat-val fp-stat-small">{homeTable}</span>
+          </div>
+          <div className="fp-stat-row">
+            <span className="fp-stat-key">Away Table</span>
+            <span className="fp-stat-val fp-stat-small">{awayTable}</span>
+          </div>
+        </div>
+      )}
 
       <div className="fp-divider" />
 
       <div className="fp-diff-row">
         <span className="fp-stat-key">FPL Difficulty</span>
         <span className="fp-diff-dots">
-          {[1,2,3,4,5].map(i => <DiffDot key={i} filled={i <= diffRating} />)}
+          {[1, 2, 3, 4, 5].map((i) => (
+            <DiffDot key={i} filled={i <= diffRating} />
+          ))}
         </span>
       </div>
 
@@ -93,6 +191,7 @@ export default function FixturePreview({ fixture, gameweek }: FixturePreviewProp
 
 const fpStyles = `
   .fp {
+    width: 100%;
     background: var(--color-beige);
     border-left: 1px solid var(--color-border);
     padding: 20px;
@@ -156,13 +255,53 @@ const fpStyles = `
     color: var(--color-char);
     margin-bottom: 10px;
   }
+  .fp-matchup {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    margin-bottom: 12px;
+  }
+  .fp-team-badge {
+    width: 48px;
+    height: 48px;
+    border-radius: 50%;
+    background: var(--color-orange);
+    color: #ffffff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: var(--font-display);
+    font-size: 13px;
+    font-weight: 700;
+  }
+  .fp-team-logo {
+    border-radius: 50%;
+    background: transparent;
+    border: none;
+    padding: 0;
+  }
+  .fp-matchup-vs {
+    font-family: 'EB Garamond', serif;
+    font-size: 20px;
+    font-style: italic;
+    color: var(--color-muted);
+  }
+  .fp-loading {
+    font-family: 'EB Garamond', serif;
+    font-size: 13px;
+    color: var(--color-muted);
+    font-style: italic;
+    margin-bottom: 8px;
+  }
   .fp-stats {
     display: flex;
     flex-direction: column;
     gap: 8px;
     margin-bottom: 4px;
   }
-  .fp-stat-row, .fp-diff-row {
+  .fp-stat-row,
+  .fp-diff-row {
     display: flex;
     align-items: center;
     justify-content: space-between;
@@ -198,7 +337,7 @@ const fpStyles = `
     border: none;
     border-radius: var(--radius-md);
     background: var(--color-orange);
-    color: #FFFFFF;
+    color: #ffffff;
     font-family: var(--font-display);
     font-size: 14px;
     font-weight: 700;
