@@ -25,6 +25,7 @@ const AVAILABLE_SLUGS = new Set([
   'newcastle',
   'nottinghamforest',
   'southampton',
+  'sunderland',
   'spurs',
   'westham',
   'wolves',
@@ -76,18 +77,28 @@ const FD_ID_TO_SLUG: Record<number, string> = {
 
 const NAME_TO_SLUG: Record<string, string> = {
   arsenal: 'arsenal',
+  'arsenal fc': 'arsenal',
   avfc: 'astonvilla',
   'aston villa': 'astonvilla',
+  'aston villa fc': 'astonvilla',
   bournemouth: 'bournemouth',
+  'afc bournemouth': 'bournemouth',
   brentford: 'brentford',
+  'brentford fc': 'brentford',
   brighton: 'brighton',
+  'brighton & hove albion': 'brighton',
+  'brighton and hove albion': 'brighton',
   burnley: 'burnley',
   che: 'chelsea',
   chelsea: 'chelsea',
+  'chelsea fc': 'chelsea',
   cp: 'crystalpalace',
   'crystal palace': 'crystalpalace',
+  'crystal palace fc': 'crystalpalace',
   everton: 'everton',
+  'everton fc': 'everton',
   fulham: 'fulham',
+  'fulham fc': 'fulham',
   leeds: 'leeds',
   'leeds united': 'leeds',
   liv: 'liverpool',
@@ -110,7 +121,10 @@ const NAME_TO_SLUG: Record<string, string> = {
   'nottm forest': 'nottinghamforest',
   forest: 'nottinghamforest',
   southampton: 'southampton',
+  'southampton fc': 'southampton',
   saints: 'southampton',
+  sunderland: 'sunderland',
+  'sunderland afc': 'sunderland',
   spurs: 'spurs',
   tottenham: 'spurs',
   'tottenham hotspur': 'spurs',
@@ -151,22 +165,31 @@ function fromName(value?: string): string | undefined {
  * 4) football-data id -> 5) football-data short name -> 6) football-data full name
  */
 export function resolveClubLogo(ref: TeamLogoRef): string | undefined {
-  const fplById = ref.fplTeamId ? slugToLogoPath(FPL_ID_TO_SLUG[ref.fplTeamId]) : undefined;
-  if (fplById) return fplById;
-
   const fplByShort = fromName(ref.fplShortName);
   if (fplByShort) return fplByShort;
 
   const fplByName = fromName(ref.fplName);
   if (fplByName) return fplByName;
 
-  const fdById = ref.fdTeamId ? slugToLogoPath(FD_ID_TO_SLUG[ref.fdTeamId]) : undefined;
-  if (fdById) return fdById;
-
   const fdByShort = fromName(ref.fdShortName);
   if (fdByShort) return fdByShort;
 
-  return fromName(ref.fdName);
+  const fdByName = fromName(ref.fdName);
+  if (fdByName) return fdByName;
+
+  // If names were provided but no mapping matched, avoid id-based collisions
+  // that can happen when source-specific numeric IDs drift season-to-season.
+  if (ref.fplShortName || ref.fplName || ref.fdShortName || ref.fdName) {
+    return undefined;
+  }
+
+  const fplById = ref.fplTeamId ? slugToLogoPath(FPL_ID_TO_SLUG[ref.fplTeamId]) : undefined;
+  if (fplById) return fplById;
+
+  const fdById = ref.fdTeamId ? slugToLogoPath(FD_ID_TO_SLUG[ref.fdTeamId]) : undefined;
+  if (fdById) return fdById;
+
+  return undefined;
 }
 
 export function getTeamInitials(name: string): string {

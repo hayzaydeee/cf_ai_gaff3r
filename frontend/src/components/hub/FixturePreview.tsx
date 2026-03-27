@@ -93,12 +93,14 @@ export default function FixturePreview({ fixture, gameweek }: FixturePreviewProp
     ? Math.round((context.fplDifficulty.home + context.fplDifficulty.away) / 2)
     : Math.round(((fixture.homeDifficulty || 3) + (fixture.awayDifficulty || 3)) / 2);
 
-  const homeTable = context
-    ? `#${context.homeTeam.leaguePosition} · ${context.homeTeam.points} pts`
-    : 'No table data';
-  const awayTable = context
-    ? `#${context.awayTeam.leaguePosition} · ${context.awayTeam.points} pts`
-    : 'No table data';
+  const homePosition = context?.homeTeam.leaguePosition && context.homeTeam.leaguePosition > 0
+    ? `#${context.homeTeam.leaguePosition}`
+    : '—';
+  const awayPosition = context?.awayTeam.leaguePosition && context.awayTeam.leaguePosition > 0
+    ? `#${context.awayTeam.leaguePosition}`
+    : '—';
+  const homeTable = context ? `${homePosition} · ${context.homeTeam.points} pts` : 'No table data';
+  const awayTable = context ? `${awayPosition} · ${context.awayTeam.points} pts` : 'No table data';
 
   return (
     <div className="fp" id="fixture-preview">
@@ -147,19 +149,19 @@ export default function FixturePreview({ fixture, gameweek }: FixturePreviewProp
       ) : (
         <div className="fp-stats">
           <div className="fp-stat-row">
-            <span className="fp-stat-key">Home Form</span>
+            <span className="fp-stat-key">{fixture.homeTeam} Form</span>
             <span className="fp-stat-val">{formDisplay(context?.homeTeam.form ?? [])}</span>
           </div>
           <div className="fp-stat-row">
-            <span className="fp-stat-key">Away Form</span>
+            <span className="fp-stat-key">{fixture.awayTeam} Form</span>
             <span className="fp-stat-val">{formDisplay(context?.awayTeam.form ?? [])}</span>
           </div>
           <div className="fp-stat-row">
-            <span className="fp-stat-key">Home Table</span>
+            <span className="fp-stat-key">{fixture.homeTeam} Table</span>
             <span className="fp-stat-val fp-stat-small">{homeTable}</span>
           </div>
           <div className="fp-stat-row">
-            <span className="fp-stat-key">Away Table</span>
+            <span className="fp-stat-key">{fixture.awayTeam} Table</span>
             <span className="fp-stat-val fp-stat-small">{awayTable}</span>
           </div>
         </div>

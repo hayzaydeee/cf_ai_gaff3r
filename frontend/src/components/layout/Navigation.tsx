@@ -121,7 +121,7 @@ export default function Navigation() {
             <nav className="nav-desktop" id="desktop-nav">
                 {/* Logo area */}
                 <div className="nav-logo-area">
-                    <span className="nav-desktop-logo">Gaff3r</span>
+                    <span className="nav-desktop-logo">gaff3r</span>
                 </div>
                 {/* Orange accent bar */}
                 <div className="nav-accent-bar" />

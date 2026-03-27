@@ -7,12 +7,12 @@ export const TEAM_ALIASES: Record<string, { fplId: number; fdId: number }> = {
   // Premier League (both IDs)
   "arsenal": { fplId: 1, fdId: 57 }, "gunners": { fplId: 1, fdId: 57 }, "ars": { fplId: 1, fdId: 57 },
   "aston villa": { fplId: 2, fdId: 58 }, "villa": { fplId: 2, fdId: 58 },
-  "bournemouth": { fplId: 3, fdId: 1044 },
-  "brentford": { fplId: 4, fdId: 402 }, "bees": { fplId: 4, fdId: 402 },
-  "brighton": { fplId: 5, fdId: 397 },
-  "chelsea": { fplId: 6, fdId: 61 }, "blues": { fplId: 6, fdId: 61 },
-  "crystal palace": { fplId: 7, fdId: 354 }, "palace": { fplId: 7, fdId: 354 },
-  "everton": { fplId: 8, fdId: 62 }, "toffees": { fplId: 8, fdId: 62 },
+  "bournemouth": { fplId: 3, fdId: 1044 }, "afc bournemouth": { fplId: 3, fdId: 1044 },
+  "brentford": { fplId: 4, fdId: 402 }, "brentford fc": { fplId: 4, fdId: 402 }, "bees": { fplId: 4, fdId: 402 },
+  "brighton": { fplId: 5, fdId: 397 }, "brighton and hove albion": { fplId: 5, fdId: 397 }, "brighton & hove albion": { fplId: 5, fdId: 397 },
+  "chelsea": { fplId: 6, fdId: 61 }, "chelsea fc": { fplId: 6, fdId: 61 }, "blues": { fplId: 6, fdId: 61 },
+  "crystal palace": { fplId: 7, fdId: 354 }, "crystal palace fc": { fplId: 7, fdId: 354 }, "palace": { fplId: 7, fdId: 354 },
+  "everton": { fplId: 8, fdId: 62 }, "everton fc": { fplId: 8, fdId: 62 }, "toffees": { fplId: 8, fdId: 62 },
   "fulham": { fplId: 9, fdId: 63 },
   "ipswich": { fplId: 10, fdId: 349 }, "ipswich town": { fplId: 10, fdId: 349 },
   "leicester": { fplId: 11, fdId: 338 }, "leicester city": { fplId: 11, fdId: 338 },
@@ -21,7 +21,8 @@ export const TEAM_ALIASES: Record<string, { fplId: number; fdId: number }> = {
   "manchester united": { fplId: 14, fdId: 66 }, "man utd": { fplId: 14, fdId: 66 }, "man united": { fplId: 14, fdId: 66 },
   "newcastle": { fplId: 15, fdId: 67 }, "newcastle united": { fplId: 15, fdId: 67 }, "magpies": { fplId: 15, fdId: 67 },
   "nottingham forest": { fplId: 16, fdId: 351 }, "forest": { fplId: 16, fdId: 351 },
-  "southampton": { fplId: 17, fdId: 340 }, "saints": { fplId: 17, fdId: 340 },
+  "southampton": { fplId: 17, fdId: 340 }, "southampton fc": { fplId: 17, fdId: 340 }, "saints": { fplId: 17, fdId: 340 },
+  "sunderland": { fplId: -1, fdId: 343 }, "sunderland afc": { fplId: -1, fdId: 343 },
   "tottenham": { fplId: 18, fdId: 73 }, "spurs": { fplId: 18, fdId: 73 },
   "west ham": { fplId: 19, fdId: 563 }, "west ham united": { fplId: 19, fdId: 563 }, "hammers": { fplId: 19, fdId: 563 },
   "wolves": { fplId: 20, fdId: 76 }, "wolverhampton": { fplId: 20, fdId: 76 },
@@ -58,3 +59,39 @@ export const TEAM_ALIASES: Record<string, { fplId: number; fdId: number }> = {
   "monaco": { fplId: -1, fdId: 548 },
   "lille": { fplId: -1, fdId: 521 },
 };
+
+export function getFdIdByFplId(fplId: number): number | undefined {
+  if (fplId <= 0) return undefined;
+
+  for (const alias of Object.values(TEAM_ALIASES)) {
+    if (alias.fplId === fplId) {
+      return alias.fdId;
+    }
+  }
+
+  return undefined;
+}
+
+function normalizeTeamName(value: string): string {
+  return value
+    .toLowerCase()
+    .replace(/[.'’]/g, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+export function getFdIdByTeamName(teamName: string): number | undefined {
+  const normalized = normalizeTeamName(teamName);
+  const direct = TEAM_ALIASES[normalized];
+  if (direct) return direct.fdId;
+
+  const compact = normalized.replace(/\s/g, '');
+  for (const [alias, ids] of Object.entries(TEAM_ALIASES)) {
+    const aliasCompact = normalizeTeamName(alias).replace(/\s/g, '');
+    if (aliasCompact === compact) {
+      return ids.fdId;
+    }
+  }
+
+  return undefined;
+}

@@ -2,7 +2,15 @@
 // Endpoints: matches, standings, team matches
 // Used for non-PL competitions (La Liga, Bundesliga, Serie A, Ligue 1, CL)
 
-import type { FDMatchesResponse, FDMatch, FDStandingsResponse, FDTableEntry } from '../types/football-data';
+import type {
+  FDMatchesResponse,
+  FDMatch,
+  FDScorer,
+  FDScorersResponse,
+  FDStandingsResponse,
+  FDTableEntry,
+  FDTeamResponse,
+} from '../types/football-data';
 import type { StandardMatchContext, StandardTeamContext, RecentResult } from '../types/app';
 import type { Env } from '../types/env';
 import { getCachedOrFetch } from './cache';
@@ -13,6 +21,8 @@ const FD_BASE = 'https://api.football-data.org/v4';
 const MATCHES_TTL = 6 * 60 * 60;      // 6 hours
 const STANDINGS_TTL = 60 * 60;         // 1 hour
 const TEAM_MATCHES_TTL = 30 * 60;      // 30 minutes
+const TEAM_DETAILS_TTL = 6 * 60 * 60;  // 6 hours
+const SCORERS_TTL = 60 * 60;           // 1 hour
 
 // Supported competition codes
 export const SUPPORTED_COMPETITIONS = ['PL', 'PD', 'BL1', 'SA', 'FL1', 'CL', 'DED', 'ELC'] as const;
@@ -100,6 +110,33 @@ export async function fetchMatch(
 ): Promise<FDMatch> {
   const res = await fdFetch(`/matches/${matchId}`, env.FOOTBALL_DATA_API_KEY);
   return res.json() as Promise<FDMatch>;
+}
+
+export async function fetchTeamDetails(
+  kv: KVNamespace,
+  env: Env,
+  teamId: number
+): Promise<FDTeamResponse> {
+  return getCachedOrFetch(kv, `fd:team:${teamId}:details`, async () => {
+    const res = await fdFetch(`/teams/${teamId}`, env.FOOTBALL_DATA_API_KEY);
+    return res.json() as Promise<FDTeamResponse>;
+  }, TEAM_DETAILS_TTL);
+}
+
+export async function fetchCompetitionScorers(
+  kv: KVNamespace,
+  env: Env,
+  competitionCode: string,
+  limit = 40
+): Promise<FDScorer[]> {
+  return getCachedOrFetch(kv, `fd:scorers:${competitionCode}:${limit}`, async () => {
+    const res = await fdFetch(
+      `/competitions/${competitionCode}/scorers?limit=${limit}`,
+      env.FOOTBALL_DATA_API_KEY
+    );
+    const data = await res.json() as FDScorersResponse;
+    return data.scorers ?? [];
+  }, SCORERS_TTL);
 }
 
 /**

@@ -386,7 +386,8 @@ const chatStyles = `
     font-size: 11px;
     font-weight: 600;
     color: var(--color-orange);
-    background: var(--color-pending-soft);
+    background: transparent;
+    border: 1px solid var(--color-orange);
     padding: 3px 10px;
     border-radius: var(--radius-pill);
   }

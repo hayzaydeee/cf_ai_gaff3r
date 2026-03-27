@@ -3,8 +3,12 @@
 // All requests server-side (FPL API blocks CORS)
 
 import type { FPLBootstrapResponse, FPLTeam, FPLPlayer, FPLFixture, FPLEvent } from '../types/fpl';
+import type { FDPerson, FDScorer } from '../types/football-data';
 import type { PLMatchContext, PLTeamContext, KeyPlayer, InjuryReport } from '../types/app';
+import type { Env } from '../types/env';
 import { getCachedOrFetch } from './cache';
+import { fetchCompetitionScorers, fetchTeamDetails } from './football-data';
+import { getFdIdByFplId, getFdIdByTeamName } from '../utils/team-aliases';
 
 const FPL_BASE = 'https://fantasy.premierleague.com/api';
 
@@ -120,7 +124,20 @@ export function buildPLTeamContext(
 function getKeyPlayers(players: FPLPlayer[]): KeyPlayer[] {
   return players
     .filter(p => p.minutes > 0) // Only players with minutes
-    .sort((a, b) => parseFloat(b.form) - parseFloat(a.form))
+    .sort((a, b) => {
+      if (b.goals_scored !== a.goals_scored) return b.goals_scored - a.goals_scored;
+      if (b.assists !== a.assists) return b.assists - a.assists;
+
+      const bInvolvements = parseFloat(b.expected_goal_involvements || '0');
+      const aInvolvements = parseFloat(a.expected_goal_involvements || '0');
+      if (bInvolvements !== aInvolvements) return bInvolvements - aInvolvements;
+
+      const bForm = parseFloat(b.form || '0');
+      const aForm = parseFloat(a.form || '0');
+      if (bForm !== aForm) return bForm - aForm;
+
+      return b.minutes - a.minutes;
+    })
     .slice(0, 5)
     .map(p => ({
       name: p.web_name,
@@ -229,7 +246,8 @@ function computeTeamStats(teamId: number, fixtures: FPLFixture[]) {
 export async function buildPLMatchContext(
   fixtureId: number,
   gameweek: number,
-  kv: KVNamespace
+  kv: KVNamespace,
+  env: Env
 ): Promise<PLMatchContext> {
   const [bootstrap, gwFixtures] = await Promise.all([
     fetchBootstrap(kv),
@@ -245,6 +263,15 @@ export async function buildPLMatchContext(
 
   // Fetch ALL fixtures for the season to compute standings + recent form
   const allFixtures = await getAllSeasonFixtures(kv, bootstrap.events);
+  const leaguePositions = computeLeaguePositions(allFixtures);
+
+  const homeTeamContext = buildPLTeamContext(fixture.team_h, bootstrap, allFixtures, gameweek);
+  const awayTeamContext = buildPLTeamContext(fixture.team_a, bootstrap, allFixtures, gameweek);
+
+  homeTeamContext.leaguePosition = leaguePositions.get(fixture.team_h) ?? 0;
+  awayTeamContext.leaguePosition = leaguePositions.get(fixture.team_a) ?? 0;
+
+  await enrichPLPersonnel(homeTeamContext, awayTeamContext, fixture.team_h, fixture.team_a, kv, env);
 
   return {
     type: 'pl',
@@ -260,9 +287,212 @@ export async function buildPLMatchContext(
       home: fixture.team_h_difficulty,
       away: fixture.team_a_difficulty,
     },
-    homeTeam: buildPLTeamContext(fixture.team_h, bootstrap, allFixtures, gameweek),
-    awayTeam: buildPLTeamContext(fixture.team_a, bootstrap, allFixtures, gameweek),
+    homeTeam: homeTeamContext,
+    awayTeam: awayTeamContext,
   };
+}
+
+async function enrichPLPersonnel(
+  homeTeamContext: PLTeamContext,
+  awayTeamContext: PLTeamContext,
+  homeFplTeamId: number,
+  awayFplTeamId: number,
+  kv: KVNamespace,
+  env: Env
+): Promise<void> {
+  const homeFdTeamId = getFdIdByFplId(homeFplTeamId) ?? getFdIdByTeamName(homeTeamContext.name);
+  const awayFdTeamId = getFdIdByFplId(awayFplTeamId) ?? getFdIdByTeamName(awayTeamContext.name);
+
+  if (!homeFdTeamId || !awayFdTeamId) {
+    return;
+  }
+
+  const [homeTeamDetails, awayTeamDetails, scorers] = await Promise.all([
+    fetchTeamDetails(kv, env, homeFdTeamId).catch(() => null),
+    fetchTeamDetails(kv, env, awayFdTeamId).catch(() => null),
+    fetchCompetitionScorers(kv, env, 'PL').catch(() => [] as FDScorer[]),
+  ]);
+
+  const homeSquad = homeTeamDetails?.squad ?? [];
+  const awaySquad = awayTeamDetails?.squad ?? [];
+
+  homeTeamContext.keyPlayers = selectPreferredKeyPlayers(
+    homeTeamContext.keyPlayers,
+    homeSquad,
+    scorers,
+    homeFdTeamId
+  );
+  awayTeamContext.keyPlayers = selectPreferredKeyPlayers(
+    awayTeamContext.keyPlayers,
+    awaySquad,
+    scorers,
+    awayFdTeamId
+  );
+
+  homeTeamContext.injuries = filterInjuriesByCurrentSquad(homeTeamContext.injuries, homeSquad);
+  awayTeamContext.injuries = filterInjuriesByCurrentSquad(awayTeamContext.injuries, awaySquad);
+}
+
+function normalizeName(name: string): string {
+  return name
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]/g, '');
+}
+
+function playerPositionFromSquad(position: string | null): string {
+  if (!position) return 'UNK';
+  const upper = position.toUpperCase();
+  if (upper.includes('GOALKEEPER')) return 'GK';
+  if (upper.includes('DEF')) return 'DEF';
+  if (upper.includes('MID')) return 'MID';
+  if (upper.includes('ATT') || upper.includes('FORWARD') || upper.includes('STRIKER')) return 'FWD';
+  return 'UNK';
+}
+
+export function selectPreferredKeyPlayers(
+  fallbackPlayers: KeyPlayer[],
+  squad: FDPerson[],
+  scorers: FDScorer[],
+  fdTeamId: number
+): KeyPlayer[] {
+  const fallbackByName = new Map(fallbackPlayers.map((player) => [normalizeName(player.name), player]));
+  const squadByName = new Map(squad.map((person) => [normalizeName(person.name), person]));
+
+  const prolificEntries = scorers
+    .filter((entry) => entry.team.id === fdTeamId)
+    .sort((a, b) => {
+      const goalDiff = (b.goals ?? 0) - (a.goals ?? 0);
+      if (goalDiff !== 0) return goalDiff;
+      return (b.assists ?? 0) - (a.assists ?? 0);
+    });
+  const prolificNames = prolificEntries.map((entry) => entry.player.name);
+
+  const captain = squad.find((person) => /captain/i.test(person.role ?? ''));
+
+  const candidateNames: string[] = [];
+  if (captain?.name) {
+    candidateNames.push(captain.name);
+  }
+  candidateNames.push(...prolificNames);
+
+  const uniqueNames: string[] = [];
+  const seen = new Set<string>();
+  for (const name of candidateNames) {
+    const key = normalizeName(name);
+    if (!key || seen.has(key)) continue;
+    if (squadByName.size > 0 && !squadByName.has(key)) continue;
+    seen.add(key);
+    uniqueNames.push(name);
+  }
+
+  const selected: KeyPlayer[] = uniqueNames.slice(0, 5).map((name) => {
+    const key = normalizeName(name);
+    const fallback = fallbackByName.get(key);
+    if (fallback) return fallback;
+
+    const scorer = prolificEntries.find((entry) => normalizeName(entry.player.name) === key);
+    const squadMember = squadByName.get(key);
+
+    return {
+      name,
+      position: playerPositionFromSquad(squadMember?.position ?? null),
+      form: 0,
+      goals: scorer?.goals ?? 0,
+      assists: scorer?.assists ?? 0,
+      xG: 0,
+      xA: 0,
+      minutes: 0,
+      status: 'available',
+    };
+  });
+
+  if (selected.length > 0) {
+    return selected;
+  }
+
+  if (squadByName.size > 0) {
+    return fallbackPlayers
+      .filter((player) => squadByName.has(normalizeName(player.name)))
+      .slice(0, 5);
+  }
+
+  return fallbackPlayers;
+}
+
+export function filterInjuriesByCurrentSquad(injuries: InjuryReport[], squad: FDPerson[]): InjuryReport[] {
+  if (squad.length === 0) {
+    return injuries;
+  }
+
+  const squadNames = new Set(squad.map((person) => normalizeName(person.name)));
+  const seen = new Set<string>();
+
+  return injuries.filter((injury) => {
+    const key = normalizeName(injury.player);
+    if (!squadNames.has(key)) {
+      return false;
+    }
+    if (seen.has(key)) {
+      return false;
+    }
+    seen.add(key);
+    return true;
+  });
+}
+
+export function computeLeaguePositions(fixtures: FPLFixture[]): Map<number, number> {
+  const table = new Map<number, { points: number; goalDifference: number; goalsFor: number }>();
+
+  for (const fixture of fixtures) {
+    if (!fixture.finished) {
+      continue;
+    }
+
+    const homeGoals = fixture.team_h_score ?? 0;
+    const awayGoals = fixture.team_a_score ?? 0;
+
+    if (!table.has(fixture.team_h)) {
+      table.set(fixture.team_h, { points: 0, goalDifference: 0, goalsFor: 0 });
+    }
+    if (!table.has(fixture.team_a)) {
+      table.set(fixture.team_a, { points: 0, goalDifference: 0, goalsFor: 0 });
+    }
+
+    const homeRow = table.get(fixture.team_h)!;
+    const awayRow = table.get(fixture.team_a)!;
+
+    homeRow.goalsFor += homeGoals;
+    awayRow.goalsFor += awayGoals;
+    homeRow.goalDifference += homeGoals - awayGoals;
+    awayRow.goalDifference += awayGoals - homeGoals;
+
+    if (homeGoals > awayGoals) {
+      homeRow.points += 3;
+    } else if (homeGoals < awayGoals) {
+      awayRow.points += 3;
+    } else {
+      homeRow.points += 1;
+      awayRow.points += 1;
+    }
+  }
+
+  const sorted = [...table.entries()].sort((a, b) => {
+    const aStats = a[1];
+    const bStats = b[1];
+    if (bStats.points !== aStats.points) return bStats.points - aStats.points;
+    if (bStats.goalDifference !== aStats.goalDifference) return bStats.goalDifference - aStats.goalDifference;
+    if (bStats.goalsFor !== aStats.goalsFor) return bStats.goalsFor - aStats.goalsFor;
+    return a[0] - b[0];
+  });
+
+  const positions = new Map<number, number>();
+  sorted.forEach(([teamId], index) => {
+    positions.set(teamId, index + 1);
+  });
+
+  return positions;
 }
 
 /**

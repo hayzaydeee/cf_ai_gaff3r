@@ -44,3 +44,41 @@ export interface FDTableEntry {
 export interface FDTeamMatchesResponse {
   matches: FDMatch[];
 }
+
+export interface FDTeamResponse {
+  id: number;
+  name: string;
+  shortName: string;
+  tla?: string;
+  squad: FDPerson[];
+}
+
+export interface FDPerson {
+  id: number;
+  name: string;
+  position: string | null;
+  dateOfBirth?: string;
+  nationality?: string;
+  shirtNumber?: number | null;
+  role?: string;
+}
+
+export interface FDScorersResponse {
+  scorers: FDScorer[];
+}
+
+export interface FDScorer {
+  player: {
+    id: number;
+    name: string;
+  };
+  team: {
+    id: number;
+    name: string;
+    shortName?: string;
+  };
+  playedMatches?: number;
+  goals?: number;
+  assists?: number;
+  penalties?: number;
+}

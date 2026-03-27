@@ -2,9 +2,9 @@ import { describe, expect, it } from 'vitest';
 import { resolveClubLogo } from './team-logo';
 
 describe('resolveClubLogo', () => {
-  it('prefers FPL id mapping first', () => {
+  it('prefers team names over potentially stale numeric ids', () => {
     const logo = resolveClubLogo({ fplTeamId: 13, fplName: 'Arsenal' });
-    expect(logo).toBe('/assets/clubs/mancity.svg');
+    expect(logo).toBe('/assets/clubs/arsenal.svg');
   });
 
   it('falls back to FPL short name and full name when id is not mapped', () => {
@@ -15,7 +15,7 @@ describe('resolveClubLogo', () => {
     expect(byName).toBe('/assets/clubs/westham.svg');
   });
 
-  it('falls back to football-data id and names when FPL fields are unavailable', () => {
+  it('falls back to football-data id after trying football-data names', () => {
     const byFdId = resolveClubLogo({ fdTeamId: 63 });
     const byFdName = resolveClubLogo({ fdShortName: 'NEW', fdName: 'Newcastle United' });
 
@@ -26,5 +26,20 @@ describe('resolveClubLogo', () => {
   it('returns undefined when no mapping can be resolved', () => {
     const logo = resolveClubLogo({ fplName: 'Some Unknown Club', fdName: 'Another Unknown' });
     expect(logo).toBeUndefined();
+  });
+
+  it('handles extended club names for corrected mappings', () => {
+    expect(resolveClubLogo({ fplName: 'Chelsea FC' })).toBe('/assets/clubs/chelsea.svg');
+    expect(resolveClubLogo({ fplName: 'Crystal Palace FC' })).toBe('/assets/clubs/crystalpalace.svg');
+    expect(resolveClubLogo({ fplName: 'AFC Bournemouth' })).toBe('/assets/clubs/bournemouth.svg');
+    expect(resolveClubLogo({ fplName: 'Brighton & Hove Albion' })).toBe('/assets/clubs/brighton.svg');
+    expect(resolveClubLogo({ fplName: 'Brentford FC' })).toBe('/assets/clubs/brentford.svg');
+    expect(resolveClubLogo({ fplName: 'Everton FC' })).toBe('/assets/clubs/everton.svg');
+    expect(resolveClubLogo({ fplName: 'Southampton FC' })).toBe('/assets/clubs/southampton.svg');
+  });
+
+  it('resolves sunderland logo when name is provided', () => {
+    expect(resolveClubLogo({ fplName: 'Sunderland' })).toBe('/assets/clubs/sunderland.svg');
+    expect(resolveClubLogo({ fplName: 'Sunderland AFC' })).toBe('/assets/clubs/sunderland.svg');
   });
 });

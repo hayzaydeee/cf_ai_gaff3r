@@ -22,7 +22,7 @@ export async function fetchMatchContext(
   env: Env
 ): Promise<MatchContext> {
   if (competitionCode === 'PL') {
-    return buildPLMatchContext(fixtureId, gameweek, kv);
+    return buildPLMatchContext(fixtureId, gameweek, kv, env);
   } else {
     // For non-PL, we need to find the match in football-data.org
     const match = await findFDMatch(fixtureId, kv, env);

@@ -368,11 +368,13 @@ const predsStyles = `
     font-size: 11px;
     font-weight: 600;
     white-space: nowrap;
+    border: 1px solid currentColor;
+    background: transparent;
   }
-  .rb--pending { background: var(--color-pending-soft); color: var(--color-pending); }
-  .rb--correct { background: var(--color-success-soft); color: var(--color-success); }
-  .rb--exact { background: var(--color-success-soft); color: var(--color-success); }
-  .rb--wrong { background: var(--color-error-soft); color: var(--color-error); }
+  .rb--pending { color: var(--color-pending); }
+  .rb--correct { color: var(--color-success); }
+  .rb--exact { color: var(--color-success); }
+  .rb--wrong { color: var(--color-error); }
 
   .preds-conf-badge {
     font-size: 12px;
