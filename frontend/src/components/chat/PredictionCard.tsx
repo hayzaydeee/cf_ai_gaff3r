@@ -1,4 +1,5 @@
-// Inline prediction card — shown within assistant messages
+// Prediction card — redesigned per spec
+// Label · Confidence badge · Score line · Outcome sub-text
 
 import type { PredictionSummary } from '../../types';
 
@@ -6,90 +7,88 @@ interface PredictionCardProps {
     prediction: PredictionSummary;
 }
 
+const CONFIDENCE_LABELS: Record<string, string> = {
+    low: 'Low Confidence',
+    medium: 'Medium Confidence',
+    high: 'High Confidence',
+};
+
 export default function PredictionCard({ prediction }: PredictionCardProps) {
-    const confidenceColor: Record<string, string> = {
-        low: 'var(--color-warning)',
-        medium: 'var(--color-orange)',
-        high: 'var(--color-success)',
-    };
+    const confLabel = CONFIDENCE_LABELS[prediction.confidence] ?? prediction.confidence;
 
     return (
-        <div className="pred-card" id="prediction-card">
-            <div className="pred-card-header">
-                <span className="pred-card-label">🎯 The Gaffer's Call</span>
-                <span
-                    className="pred-confidence"
-                    style={{ color: confidenceColor[prediction.confidence] }}
-                >
-                    {prediction.confidence.toUpperCase()}
-                </span>
+        <div className="pc" id="prediction-card">
+            <div className="pc-header">
+                <span className="pc-label">Gaff3r's Prediction</span>
+                <span className={`pc-conf pc-conf--${prediction.confidence}`}>{confLabel}</span>
             </div>
 
-            <div className="pred-scoreline">
-                <span className="pred-team">{prediction.homeTeam}</span>
-                <span className="pred-score">
-                    {prediction.predictedScore.home} - {prediction.predictedScore.away}
-                </span>
-                <span className="pred-team">{prediction.awayTeam}</span>
+            <div className="pc-score">
+                {prediction.homeTeam} {prediction.predictedScore.home} – {prediction.predictedScore.away} {prediction.awayTeam}
             </div>
 
             {prediction.reasoning && (
-                <p className="pred-reasoning">{prediction.reasoning}</p>
+                <p className="pc-desc">{prediction.reasoning}</p>
             )}
 
             <style>{`
-        .pred-card {
-          margin-top: 10px;
-          padding: 12px;
+        .pc {
+          margin-top: 12px;
+          padding: 14px 16px;
           background: var(--color-cream);
-          border: 1px solid var(--color-orange-soft);
+          border: 1px solid var(--color-border);
           border-left: 3px solid var(--color-orange);
           border-radius: var(--radius-md);
         }
-        .pred-card-header {
+        [data-theme="dark"] .pc { background: var(--color-beige); }
+        .pc-header {
           display: flex;
-          justify-content: space-between;
           align-items: center;
-          margin-bottom: 8px;
+          justify-content: space-between;
+          margin-bottom: 10px;
         }
-        .pred-card-label {
-          font-family: var(--font-display);
-          font-size: 12px;
-          font-weight: 700;
-          color: var(--color-char-light);
-        }
-        .pred-confidence {
+        .pc-label {
           font-family: var(--font-display);
           font-size: 11px;
-          font-weight: 800;
-          letter-spacing: 1px;
-        }
-        .pred-scoreline {
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          gap: 12px;
-          padding: 8px 0;
-        }
-        .pred-team {
-          font-family: var(--font-display);
-          font-size: 14px;
           font-weight: 700;
-          text-align: center;
-          flex: 1;
+          text-transform: uppercase;
+          letter-spacing: 0.8px;
+          color: var(--color-muted);
         }
-        .pred-score {
+        .pc-conf {
           font-family: var(--font-display);
-          font-size: 24px;
-          font-weight: 800;
-          color: var(--color-orange);
-          letter-spacing: 2px;
+          font-size: 10px;
+          font-weight: 600;
+          padding: 2px 10px;
+          border-radius: var(--radius-pill);
         }
-        .pred-reasoning {
-          font-size: 13px;
+        .pc-conf--low {
+          background: var(--color-beige);
           color: var(--color-char-light);
-          margin: 4px 0 0;
+        }
+        .pc-conf--medium {
+          background: var(--color-pending-soft);
+          color: var(--color-pending);
+        }
+        .pc-conf--high {
+          background: var(--color-success-soft);
+          color: var(--color-success);
+        }
+        .pc-score {
+          font-family: var(--font-display);
+          font-size: 18px;
+          font-weight: 700;
+          color: var(--color-char);
+          margin-bottom: 6px;
+          line-height: 1.2;
+        }
+        .pc-desc {
+          font-family: 'EB Garamond', serif;
+          font-size: 13px;
           font-style: italic;
+          color: var(--color-muted);
+          margin: 0;
+          line-height: 1.5;
         }
       `}</style>
         </div>

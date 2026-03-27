@@ -16,11 +16,17 @@
   --color-char-light: #5C4F49;
   --color-char-muted: #8A7D76;
 
+  /* Border & muted text */
+  --color-border: #E8D9BB;
+  --color-muted: #8A6A55;
+
   /* Semantic */
   --color-success: #2E7D32;
-  --color-success-soft: #2E7D3220;
+  --color-success-soft: #E6F5EA;
   --color-error: #C62828;
-  --color-error-soft: #C6282820;
+  --color-error-soft: #FDECEA;
+  --color-pending: #FA8112;
+  --color-pending-soft: #FFF0E0;
   --color-warning: #E65100;
 
   /* Radii */

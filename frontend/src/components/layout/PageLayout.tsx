@@ -1,5 +1,7 @@
-// Shared page layout wrapper with navigation
-// Handles content area spacing for all 3 nav variants
+// Shared page layout wrapper
+// Desktop: sidebar takes up 220px left; main content fills the rest
+// Tablet: 56px top bar, content below
+// Mobile: bottom tab bar, content above
 
 import Navigation from './Navigation';
 
@@ -19,10 +21,11 @@ export default function PageLayout({ children }: PageLayoutProps) {
         .layout-root {
           min-height: 100vh;
         }
+        /* Mobile */
         .layout-content {
-          /* Mobile: bottom nav padding */
           padding: 16px;
           padding-bottom: 80px;
+          min-height: 100vh;
         }
         /* Tablet: top nav offset */
         @media (min-width: 768px) {
@@ -30,12 +33,14 @@ export default function PageLayout({ children }: PageLayoutProps) {
             padding: 72px 24px 24px;
           }
         }
-        /* Desktop: sidebar offset */
+        /* Desktop: sidebar offset — no max-width so pages can fill */
         @media (min-width: 1200px) {
           .layout-content {
             margin-left: 220px;
-            padding: 24px 32px;
-            max-width: 1200px;
+            padding: 0;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
           }
         }
       `}</style>

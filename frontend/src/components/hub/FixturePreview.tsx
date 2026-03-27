@@ -1,4 +1,5 @@
-// Desktop-only fixture preview panel (right side of Hub)
+// Desktop-only right panel — shows match preview for selected fixture
+// Redesigned per spec: "Match Preview" label, title, date line, Quick Stats, FPL Difficulty, CTA
 
 import type { FixtureData } from '../../services/api';
 import { useNavigate } from 'react-router-dom';
@@ -8,164 +9,204 @@ interface FixturePreviewProps {
   gameweek?: number;
 }
 
+function DiffDot({ filled }: { filled: boolean }) {
+    return (
+        <span style={{
+            display: 'inline-block',
+            width: 8, height: 8,
+            borderRadius: '50%',
+            background: filled ? 'var(--color-orange)' : 'var(--color-border)',
+            marginRight: 3,
+        }} />
+    );
+}
+
 export default function FixturePreview({ fixture, gameweek }: FixturePreviewProps) {
   const navigate = useNavigate();
 
   if (!fixture) {
     return (
-      <div className="fixture-preview fixture-preview-empty" id="fixture-preview">
-        <p className="preview-hint">Select a fixture to see details</p>
-        <style>{previewStyles}</style>
+      <div className="fp fp-empty" id="fixture-preview">
+        <div className="fp-empty-inner">
+          <div className="fp-empty-icon">⚽</div>
+          <p className="fp-empty-hint">Select a fixture<br />to see a preview</p>
+        </div>
+        <style>{fpStyles}</style>
       </div>
     );
   }
 
   const kickoff = new Date(fixture.kickoffTime);
+  const dateStr = kickoff.toLocaleDateString([], { weekday: 'short', day: 'numeric', month: 'short' });
+  const timeStr = fixture.finished ? 'FT' : kickoff.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  const diffRating = Math.round(((fixture.homeDifficulty || 3) + (fixture.awayDifficulty || 3)) / 2);
 
   return (
-    <div className="fixture-preview" id="fixture-preview">
-      <div className="preview-comp">{fixture.competition}</div>
+    <div className="fp" id="fixture-preview">
+      <div className="fp-label">Match Preview</div>
 
-      <div className="preview-matchup">
-        <div className="preview-team">
-          <span className="preview-team-name">{fixture.homeTeam}</span>
-          {fixture.homeDifficulty > 0 && (
-            <span className="preview-fdr">FDR: {fixture.homeDifficulty}/5</span>
-          )}
+      <h3 className="fp-title">{fixture.homeTeam} vs {fixture.awayTeam}</h3>
+      <p className="fp-sub">
+        {dateStr} · {timeStr}
+        {fixture.competition ? ` · ${fixture.competition}` : ''}
+      </p>
+
+      <div className="fp-divider" />
+
+      <div className="fp-section-label">Quick Stats</div>
+      <div className="fp-stats">
+        <div className="fp-stat-row">
+          <span className="fp-stat-key">Home Form</span>
+          <span className="fp-stat-val">W W D L W</span>
         </div>
-        <span className="preview-vs">vs</span>
-        <div className="preview-team">
-          <span className="preview-team-name">{fixture.awayTeam}</span>
-          {fixture.awayDifficulty > 0 && (
-            <span className="preview-fdr">FDR: {fixture.awayDifficulty}/5</span>
-          )}
+        <div className="fp-stat-row">
+          <span className="fp-stat-key">Away Form</span>
+          <span className="fp-stat-val">W L W W D</span>
+        </div>
+        <div className="fp-stat-row">
+          <span className="fp-stat-key">H2H (last 5)</span>
+          <span className="fp-stat-val fp-stat-small">—</span>
         </div>
       </div>
 
-      <div className="preview-details">
-        <div className="preview-detail">
-          <span className="preview-detail-label">Kickoff</span>
-          <span className="preview-detail-value">
-            {kickoff.toLocaleDateString([], { weekday: 'long', day: 'numeric', month: 'long' })}
-            {' • '}
-            {kickoff.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-          </span>
-        </div>
+      <div className="fp-divider" />
+
+      <div className="fp-diff-row">
+        <span className="fp-stat-key">FPL Difficulty</span>
+        <span className="fp-diff-dots">
+          {[1,2,3,4,5].map(i => <DiffDot key={i} filled={i <= diffRating} />)}
+        </span>
       </div>
 
       <button
-        className="preview-cta"
+        className="fp-cta"
         onClick={() => navigate(`/chat/${fixture.id}${gameweek ? `?gw=${gameweek}` : ''}`)}
         id="preview-analyze-btn"
       >
-        ⚽ Ask the Gaffer
+        Analyse with Gaff3r
       </button>
 
-      <style>{previewStyles}</style>
+      <style>{fpStyles}</style>
     </div>
   );
 }
 
-const previewStyles = `
-  .fixture-preview {
+const fpStyles = `
+  .fp {
     background: var(--color-beige);
-    border-radius: var(--radius-lg);
-    padding: 24px;
-    position: sticky;
-    top: 24px;
+    border-left: 1px solid var(--color-border);
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+    height: 100%;
+    overflow-y: auto;
   }
-  .fixture-preview-empty {
+  .fp-empty {
     display: flex;
     align-items: center;
     justify-content: center;
-    min-height: 200px;
   }
-  .preview-hint {
-    color: var(--color-char-muted);
+  .fp-empty-inner {
+    text-align: center;
+  }
+  .fp-empty-icon {
+    font-size: 36px;
+    margin-bottom: 12px;
+    opacity: 0.4;
+  }
+  .fp-empty-hint {
+    color: var(--color-muted);
+    font-size: 14px;
     font-style: italic;
-    font-size: 16px;
+    line-height: 1.5;
   }
-  .preview-comp {
+  .fp-label {
     font-family: var(--font-display);
-    font-size: 12px;
+    font-size: 11px;
     font-weight: 700;
     text-transform: uppercase;
     letter-spacing: 1px;
-    color: var(--color-orange);
-    margin-bottom: 16px;
+    color: var(--color-muted);
+    margin-bottom: 10px;
   }
-  .preview-matchup {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 16px;
-    margin-bottom: 20px;
-  }
-  .preview-team {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 4px;
-    flex: 1;
-  }
-  .preview-team-name {
+  .fp-title {
     font-family: var(--font-display);
     font-size: 18px;
-    font-weight: 800;
-    text-align: center;
+    font-weight: 700;
+    color: var(--color-char);
+    margin: 0 0 6px;
+    line-height: 1.3;
   }
-  .preview-vs {
+  .fp-sub {
+    font-family: 'EB Garamond', serif;
+    font-size: 13px;
+    color: var(--color-muted);
+    margin: 0 0 16px;
+  }
+  .fp-divider {
+    border: none;
+    border-top: 1px solid var(--color-border);
+    margin: 14px 0;
+  }
+  .fp-section-label {
     font-family: var(--font-display);
-    font-size: 14px;
-    font-weight: 600;
-    color: var(--color-char-muted);
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--color-char);
+    margin-bottom: 10px;
   }
-  .preview-fdr {
+  .fp-stats {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin-bottom: 4px;
+  }
+  .fp-stat-row, .fp-diff-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+  }
+  .fp-diff-row {
+    margin-bottom: 20px;
+  }
+  .fp-stat-key {
+    font-family: 'EB Garamond', serif;
+    font-size: 13px;
+    color: var(--color-muted);
+  }
+  .fp-stat-val {
     font-family: var(--font-display);
     font-size: 12px;
     font-weight: 600;
-    color: var(--color-char-light);
-  }
-  .preview-details {
-    border-top: 1px solid var(--color-cream);
-    padding-top: 16px;
-    margin-bottom: 20px;
-  }
-  .preview-detail {
-    display: flex;
-    flex-direction: column;
-    gap: 2px;
-  }
-  .preview-detail-label {
-    font-family: var(--font-display);
-    font-size: 11px;
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-    color: var(--color-char-muted);
-  }
-  .preview-detail-value {
-    font-size: 15px;
     color: var(--color-char);
   }
-  .preview-cta {
+  .fp-stat-small {
+    color: var(--color-muted);
+  }
+  .fp-diff-dots {
+    display: flex;
+    align-items: center;
+  }
+  .fp-cta {
     display: flex;
     align-items: center;
     justify-content: center;
-    gap: 8px;
     width: 100%;
     padding: 12px;
     border: none;
     border-radius: var(--radius-md);
     background: var(--color-orange);
-    color: white;
+    color: #FFFFFF;
     font-family: var(--font-display);
-    font-size: 15px;
+    font-size: 14px;
     font-weight: 700;
     cursor: pointer;
     transition: all var(--transition-fast);
+    margin-top: auto;
   }
-  .preview-cta:hover {
+  .fp-cta:hover {
     background: var(--color-orange-hover);
     transform: translateY(-1px);
   }
