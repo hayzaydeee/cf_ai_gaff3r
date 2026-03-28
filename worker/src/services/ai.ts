@@ -243,14 +243,15 @@ export async function runAnalysisStreaming(
         .replace(/<<<PREDICTION_JSON>>>[\s\S]*?<<<END_PREDICTION_JSON>>>/g, '')
         .trim();
 
+      emit({ type: 'done', response: cleanResponse, prediction, ...extraDoneData });
+      controller.close();
+
+      // Post-processing runs after stream closes so it never blocks the done event
       try {
         await onComplete(cleanResponse, prediction);
       } catch (err) {
         console.warn('Streaming onComplete failed:', err);
       }
-
-      emit({ type: 'done', response: cleanResponse, prediction, ...extraDoneData });
-      controller.close();
     },
   });
 }
