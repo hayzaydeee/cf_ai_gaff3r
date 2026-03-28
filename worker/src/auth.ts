@@ -15,6 +15,7 @@ export function getAuth(env: Env) {
   const hasGoogle = !!(env.GOOGLE_CLIENT_ID && env.GOOGLE_CLIENT_SECRET);
 
   return betterAuth({
+    secret: env.BETTER_AUTH_SECRET,
     // Better Auth needs to know its own URL to build callback/redirect URIs.
     // Set BETTER_AUTH_URL in .dev.vars for local dev; in production it's set as a secret.
     baseURL: env.BETTER_AUTH_URL ?? 'http://localhost:8787',
