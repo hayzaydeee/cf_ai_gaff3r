@@ -229,6 +229,7 @@ export async function runAnalysisStreaming(
   extraDoneData: Record<string, unknown>,
   onComplete: (response: string, prediction: PredictionData | null, typedPrediction: TypedPredictionPayload | null) => Promise<void>,
   metaData?: { hasModel: boolean; intent: string },
+  ctx?: ExecutionContext,
 ): Promise<ReadableStream<Uint8Array>> {
   // Workers AI with stream:true returns ReadableStream<Uint8Array>
   const aiStream = await env.AI.run(
@@ -322,11 +323,15 @@ export async function runAnalysisStreaming(
       });
       controller.close();
 
-      // Post-processing runs after stream closes so it never blocks the done event
-      try {
-        await onComplete(cleanResponse, prediction, typedPrediction);
-      } catch (err) {
+      // Post-processing (DO writes) must be registered with ctx.waitUntil so CF Workers
+      // guarantees completion even after the stream response is fully sent to the client.
+      const postProcess = onComplete(cleanResponse, prediction, typedPrediction).catch(err => {
         console.warn('Streaming onComplete failed:', err);
+      });
+      if (ctx) {
+        ctx.waitUntil(postProcess);
+      } else {
+        await postProcess;
       }
     },
   });

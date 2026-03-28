@@ -237,7 +237,7 @@ export async function handleChat(
       adjustmentNotes: adjustmentNotes.length > 0 ? adjustmentNotes : undefined,
     };
     const streamMeta = { hasModel: shouldRunModel(intent), intent: intent ?? 'result' };
-    const streamBody = await runAnalysisStreaming(env, SYSTEM_PROMPT, userPrompt, extraDone, runPostProcessing, streamMeta);
+    const streamBody = await runAnalysisStreaming(env, SYSTEM_PROMPT, userPrompt, extraDone, runPostProcessing, streamMeta, ctx);
     return new Response(streamBody, {
       headers: {
         'Content-Type': 'text/event-stream',
