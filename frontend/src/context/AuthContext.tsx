@@ -9,7 +9,6 @@ interface AuthContextValue {
   user: AuthUser | null;
   isLoading: boolean;
   isAuthenticated: boolean;
-  signInWithMagicLink: (email: string) => Promise<{ success: boolean; error?: string }>;
   signInWithGoogle: () => Promise<void>;
   signOut: () => Promise<void>;
 }
@@ -20,17 +19,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const { data: session, isPending } = authClient.useSession();
   const [isSocialLoading, setIsSocialLoading] = useState(false);
   const navigate = useNavigate();
-
-  const signInWithMagicLink = useCallback(async (email: string) => {
-    const result = await authClient.signIn.magicLink({
-      email,
-      callbackURL: window.location.origin + '/hub',
-    });
-    if (result.error) {
-      return { success: false, error: result.error.message ?? 'Failed to send magic link' };
-    }
-    return { success: true };
-  }, []);
 
   const signInWithGoogle = useCallback(async () => {
     setIsSocialLoading(true);
@@ -55,7 +43,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         user: session?.user ?? null,
         isLoading: isPending || isSocialLoading,
         isAuthenticated: !!session?.user,
-        signInWithMagicLink,
         signInWithGoogle,
         signOut,
       }}

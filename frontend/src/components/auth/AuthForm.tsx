@@ -1,20 +1,10 @@
-// Auth form — magic link + Google OAuth
+// Auth form — Google OAuth only
 // Shared between AuthModal and AuthPage
 
-import { useState, type FormEvent } from 'react';
 import { useAuth } from '../../context/AuthContext';
 
 interface AuthFormProps {
   onSuccess?: () => void;
-}
-
-function EnvelopeIcon() {
-  return (
-    <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <rect x="2" y="4" width="20" height="16" rx="2" />
-      <path d="M2 7l10 7 10-7" />
-    </svg>
-  );
 }
 
 function GoogleIcon() {
@@ -28,43 +18,8 @@ function GoogleIcon() {
   );
 }
 
-export default function AuthForm({ onSuccess }: AuthFormProps) {
-  const { signInWithMagicLink, signInWithGoogle, isLoading } = useAuth();
-  const [email, setEmail] = useState('');
-  const [magicLinkSent, setMagicLinkSent] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [isSending, setIsSending] = useState(false);
-
-  async function handleMagicLink(e: FormEvent) {
-    e.preventDefault();
-    if (!email.trim() || isSending) return;
-    setError(null);
-    setIsSending(true);
-    const result = await signInWithMagicLink(email.trim());
-    setIsSending(false);
-    if (result.success) {
-      setMagicLinkSent(true);
-      onSuccess?.();
-    } else {
-      setError(result.error ?? 'Something went wrong. Try again.');
-    }
-  }
-
-  if (magicLinkSent) {
-    return (
-      <div className="af-sent">
-        <span className="af-sent-icon"><EnvelopeIcon /></span>
-        <p className="af-sent-title">Check your email</p>
-        <p className="af-sent-body">
-          We sent a sign-in link to <strong>{email}</strong>.<br />
-          It expires in 15 minutes.
-        </p>
-        <button className="af-link-btn" onClick={() => setMagicLinkSent(false)}>
-          Use a different email
-        </button>
-      </div>
-    );
-  }
+export default function AuthForm({ onSuccess: _onSuccess }: AuthFormProps) {
+  const { signInWithGoogle, isLoading } = useAuth();
 
   return (
     <div className="af-root">
@@ -74,26 +29,6 @@ export default function AuthForm({ onSuccess }: AuthFormProps) {
         <p className="af-sub">Save your predictions across devices</p>
       </div>
 
-      <form onSubmit={handleMagicLink} className="af-form" noValidate>
-        <input
-          type="email"
-          className="af-input"
-          placeholder="your@email.com"
-          aria-label="Email address"
-          value={email}
-          onChange={e => setEmail(e.target.value)}
-          required
-          autoFocus
-          disabled={isSending}
-        />
-        {error && <p className="af-error">{error}</p>}
-        <button type="submit" className="af-btn-primary" disabled={isSending || !email.trim()}>
-          {isSending ? 'Sending…' : 'Send magic link'}
-        </button>
-      </form>
-
-      <div className="af-divider"><span>or</span></div>
-
       <button
         type="button"
         className="af-btn-google"
@@ -101,7 +36,7 @@ export default function AuthForm({ onSuccess }: AuthFormProps) {
         disabled={isLoading}
       >
         <GoogleIcon />
-        Continue with Google
+        {isLoading ? 'Redirecting…' : 'Continue with Google'}
       </button>
 
       <style>{`
@@ -132,67 +67,13 @@ export default function AuthForm({ onSuccess }: AuthFormProps) {
           line-height: 1.4;
         }
 
-        .af-form { display: flex; flex-direction: column; gap: 8px; margin-bottom: 12px; }
-        .af-input {
-          width: 100%;
-          padding: 11px 13px;
-          border: 1px solid var(--color-border);
-          border-radius: var(--radius-md);
-          background: var(--color-bg);
-          color: var(--color-char);
-          font-size: 14px;
-          outline: none;
-          box-sizing: border-box;
-          transition: border-color 0.15s;
-        }
-        .af-input::placeholder { color: var(--color-char-muted); }
-        .af-input:focus { border-color: var(--color-orange); }
-        .af-input:disabled { opacity: 0.6; }
-
-        .af-error { font-size: 12px; color: #dc2626; margin: 0; }
-
-        .af-btn-primary {
-          width: 100%;
-          padding: 12px 16px;
-          background: var(--color-orange);
-          color: #fff;
-          border: none;
-          border-radius: var(--radius-md);
-          font-family: var(--font-display);
-          font-size: 14px;
-          font-weight: 600;
-          cursor: pointer;
-          transition: background 0.15s;
-          letter-spacing: 0.01em;
-        }
-        .af-btn-primary:hover:not(:disabled) { background: var(--color-orange-hover); }
-        .af-btn-primary:disabled { opacity: 0.55; cursor: not-allowed; }
-
-        .af-divider {
-          display: flex;
-          align-items: center;
-          gap: 10px;
-          margin: 12px 0;
-          color: var(--color-char-muted);
-          font-size: 11px;
-          letter-spacing: 0.06em;
-          text-transform: uppercase;
-        }
-        .af-divider::before,
-        .af-divider::after {
-          content: '';
-          flex: 1;
-          height: 1px;
-          background: var(--color-border);
-        }
-
         .af-btn-google {
           display: flex;
           align-items: center;
           justify-content: center;
           gap: 9px;
           width: 100%;
-          padding: 11px 16px;
+          padding: 12px 16px;
           background: transparent;
           color: var(--color-char);
           border: 1px solid var(--color-border);
@@ -209,41 +90,6 @@ export default function AuthForm({ onSuccess }: AuthFormProps) {
           border-color: var(--color-char-muted);
         }
         .af-btn-google:disabled { opacity: 0.55; cursor: not-allowed; }
-
-        /* "Check your email" state */
-        .af-sent {
-          display: flex;
-          flex-direction: column;
-          align-items: center;
-          text-align: center;
-          padding: 8px 0 4px;
-          gap: 10px;
-        }
-        .af-sent-icon { color: var(--color-orange); }
-        .af-sent-title {
-          font-family: var(--font-display);
-          font-size: 17px;
-          font-weight: 700;
-          color: var(--color-char);
-          margin: 0;
-        }
-        .af-sent-body {
-          font-size: 13px;
-          color: var(--color-char-muted);
-          margin: 0;
-          line-height: 1.55;
-        }
-        .af-link-btn {
-          background: none;
-          border: none;
-          color: var(--color-orange);
-          font-size: 12px;
-          font-weight: 600;
-          cursor: pointer;
-          padding: 0;
-          text-decoration: underline;
-          text-underline-offset: 2px;
-        }
       `}</style>
     </div>
   );
