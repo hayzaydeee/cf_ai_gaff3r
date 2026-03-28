@@ -26,7 +26,11 @@ async function fetchAPI<T>(path: string, options: RequestInit = {}): Promise<T> 
     ...(options.headers as Record<string, string> ?? {}),
   };
 
-  const res = await fetch(url, { ...options, headers });
+  const res = await fetch(url, {
+    ...options,
+    headers,
+    credentials: 'include', // send session cookie when authenticated
+  });
 
   if (!res.ok) {
     const error = await res.json().catch(() => ({ error: res.statusText }));

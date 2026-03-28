@@ -7,9 +7,23 @@ export interface Env {
   // KV Namespaces
   FPL_CACHE: KVNamespace;
 
-  // Workers AI
+  // Workers AI (AI Gateway configured at runtime)
   AI: Ai;
 
-  // Secrets
+  // D1 Database
+  DB: D1Database;
+
+  // Vectorize (RAG)
+  VECTORIZE: VectorizeIndex;
+
+  // Rate Limiters
+  RATE_LIMITER_CHAT: RateLimit;
+  RATE_LIMITER_FIXTURES: RateLimit;
+
+  // Secrets — set via wrangler secret put or .dev.vars locally
   FOOTBALL_DATA_API_KEY: string;
+  BETTER_AUTH_SECRET: string;
+  GOOGLE_CLIENT_ID: string;
+  GOOGLE_CLIENT_SECRET: string;
+  RESEND_API_KEY: string;
 }

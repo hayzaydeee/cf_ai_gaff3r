@@ -6,6 +6,10 @@ import { handleGetMatchContext } from './routes/match-context';
 import { handleChat } from './routes/chat';
 import { handleGetPredictions } from './routes/predictions';
 import { handleGetStats, handleResolve } from './routes/stats';
+import { handleMigrateAnonymous } from './routes/migrate';
+import { getAuth, getSessionUserId } from './auth';
+import { runFplSnapshot } from './cron/fplSnapshot';
+import { runResolvePredictions } from './cron/resolvePredictions';
 
 export { UserState } from './durable-objects/user-state';
 
@@ -14,8 +18,8 @@ export { UserState } from './durable-objects/user-state';
 // Allowed Pages origins. Adjust when deploying.
 // In dev, wrangler dev serves on localhost:8787 and the Vite proxy handles CORS.
 const ALLOWED_ORIGINS = new Set([
-  'https://gaff3r.com',
-  'https://www.gaff3r.com',
+  'https://gaff3r.xyz',
+  'https://www.gaff3r.xyz',
   'https://cf-ai-gaff3r.pages.dev',
   'http://localhost:5173', // local dev only — wrangler strips this in prod
 ]);
@@ -39,6 +43,20 @@ const USER_ID_REGEX = /^usr_[a-zA-Z0-9_-]{1,59}$/;
 // ── Router ──
 
 export default {
+  async scheduled(controller: ScheduledController, env: Env): Promise<void> {
+    try {
+      if (controller.cron === '0 2 * * 1') {
+        await runFplSnapshot(env);
+      } else if (controller.cron === '0 8 * * *') {
+        await runResolvePredictions(env);
+      } else {
+        console.warn(`[scheduled] Unknown cron expression: ${controller.cron}`);
+      }
+    } catch (err) {
+      console.error('[scheduled] Cron handler threw:', err);
+    }
+  },
+
   async fetch(request: Request, env: Env): Promise<Response> {
     const url = new URL(request.url);
     const path = url.pathname;
@@ -54,6 +72,16 @@ export default {
 
     try {
       let response: Response;
+
+      // ── Auth routes — proxy directly to Better Auth ──
+      // Better Auth handles all /api/auth/* paths (magic link, Google OAuth, session, sign-out)
+
+      if (path.startsWith('/api/auth/')) {
+        const auth = getAuth(env);
+        const authResponse = await auth.handler(request);
+        // Apply security headers to auth responses too
+        return secured(authResponse, origin);
+      }
 
       // ── Public routes (no userId required) ──
 
@@ -81,17 +109,27 @@ export default {
         return secured(response, origin);
       }
 
-      // ── Authenticated routes (userId required) ──
+      // ── Authenticated routes — dual-identity resolution ──
+      // Prefer a Better Auth session cookie; fall back to anonymous x-user-id header.
 
-      const userId = request.headers.get('x-user-id');
+      let userId: string | null = null;
+      let isAuthenticated = false;
 
-      if (!userId) {
-        return secured(errorResponse('Missing x-user-id header', 401), origin);
+      // 1. Try session cookie (authenticated user)
+      const sessionUserId = await getSessionUserId(request, env);
+      if (sessionUserId) {
+        userId = sessionUserId;
+        isAuthenticated = true;
+      } else {
+        // 2. Fall back to anonymous x-user-id header
+        const anonId = request.headers.get('x-user-id');
+        if (anonId && USER_ID_REGEX.test(anonId)) {
+          userId = anonId;
+        }
       }
 
-      // Validate userId format — prevents using arbitrary strings as DO keys
-      if (!USER_ID_REGEX.test(userId)) {
-        return secured(errorResponse('Invalid user ID format', 400), origin);
+      if (!userId) {
+        return secured(errorResponse('Unauthorised — sign in or provide x-user-id header', 401), origin);
       }
 
       // GET /api/chat/:gw — load stored chat history
@@ -147,7 +185,7 @@ export default {
           headers: request.headers,
           body: JSON.stringify({ message: message.trim(), gameweek, fixtureId, userId }),
         });
-        response = await handleChat(validatedRequest, userId, env);
+        response = await handleChat(validatedRequest, userId, env, isAuthenticated);
         return secured(response, origin);
       }
 
@@ -163,6 +201,15 @@ export default {
 
       if (path === '/api/resolve' && request.method === 'POST') {
         response = await handleResolve(userId, env);
+        return secured(response, origin);
+      }
+
+      // POST /api/migrate-anonymous — copy anonymous DO data to authenticated account
+      if (path === '/api/migrate-anonymous' && request.method === 'POST') {
+        if (!isAuthenticated) {
+          return secured(errorResponse('Must be signed in to migrate data', 403), origin);
+        }
+        response = await handleMigrateAnonymous(request, userId, env);
         return secured(response, origin);
       }
 
@@ -184,11 +231,12 @@ export default {
  * when it matches, return a restrictive value otherwise.
  */
 function corsHeaders(origin: string): Record<string, string> {
-  const allowedOrigin = ALLOWED_ORIGINS.has(origin) ? origin : 'https://gaff3r.com';
+  const allowedOrigin = ALLOWED_ORIGINS.has(origin) ? origin : 'https://gaff3r.xyz';
   return {
     'Access-Control-Allow-Origin': allowedOrigin,
     'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
     'Access-Control-Allow-Headers': 'Content-Type, x-user-id',
+    'Access-Control-Allow-Credentials': 'true',  // required for session cookies
     'Access-Control-Max-Age': '86400',
     'Vary': 'Origin',
   };

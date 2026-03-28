@@ -2,8 +2,11 @@
 // Mobile: bottom tab bar | Tablet: top nav | Desktop: left sidebar (220px)
 // Redesign: spec-accurate orange sidebar, solid active state, icon set
 
+import { useState } from 'react';
 import { NavLink } from 'react-router-dom';
 import { useTheme } from '../../hooks/useTheme';
+import { useAuth } from '../../context/AuthContext';
+import AuthModal from '../common/AuthModal';
 
 // ── Lucide-style SVG icons ──
 
@@ -74,8 +77,19 @@ const NAV_ITEMS = [
     { path: '/stats', label: 'Stats', icon: TrendingUpIcon },
 ];
 
+function UserIcon() {
+    return (
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+            <circle cx="12" cy="7" r="4" />
+        </svg>
+    );
+}
+
 export default function Navigation() {
     const { theme, toggleTheme } = useTheme();
+    const { user, isAuthenticated, signOut } = useAuth();
+    const [authModalOpen, setAuthModalOpen] = useState(false);
 
     return (
         <>
@@ -92,6 +106,14 @@ export default function Navigation() {
                         <span className="nav-tab-label">{item.label}</span>
                     </NavLink>
                 ))}
+                <button
+                    className={`nav-tab ${isAuthenticated ? 'nav-tab-active' : ''}`}
+                    onClick={() => isAuthenticated ? signOut() : setAuthModalOpen(true)}
+                    aria-label={isAuthenticated ? 'Sign out' : 'Sign in'}
+                >
+                    <UserIcon />
+                    <span className="nav-tab-label">{isAuthenticated ? 'You' : 'Sign in'}</span>
+                </button>
             </nav>
 
             {/* ── Tablet: Top nav bar ── */}
@@ -112,6 +134,16 @@ export default function Navigation() {
                         </NavLink>
                     ))}
                 </div>
+                {isAuthenticated ? (
+                    <button onClick={signOut} className="nav-user-btn" title={user?.email ?? ''}>
+                        <UserIcon />
+                        <span className="nav-user-email">{user?.email?.split('@')[0]}</span>
+                    </button>
+                ) : (
+                    <button onClick={() => setAuthModalOpen(true)} className="nav-signin-btn">
+                        Sign in
+                    </button>
+                )}
                 <button onClick={toggleTheme} className="nav-theme-btn" aria-label="Toggle theme" id="theme-toggle">
                     {theme === 'light' ? <MoonIcon /> : <SunIcon />}
                 </button>
@@ -143,8 +175,20 @@ export default function Navigation() {
                     ))}
                 </div>
 
-                {/* Footer / theme toggle */}
+                {/* Footer / auth + theme toggle */}
                 <div className="nav-desktop-footer">
+                    {isAuthenticated ? (
+                        <button onClick={signOut} className="nav-theme-btn-full">
+                            <UserIcon />
+                            <span className="nav-user-name" title={user?.email ?? ''}>{user?.email?.split('@')[0]}</span>
+                            <span className="nav-signout-hint">Sign out</span>
+                        </button>
+                    ) : (
+                        <button onClick={() => setAuthModalOpen(true)} className="nav-theme-btn-full nav-signin-desktop">
+                            <UserIcon />
+                            <span>Sign in</span>
+                        </button>
+                    )}
                     <button onClick={toggleTheme} className="nav-theme-btn-full" id="desktop-theme-toggle">
                         {theme === 'light' ? <MoonIcon /> : <SunIcon />}
                     <span>{theme === 'light' ? 'Dark Mode' : 'Light Mode'}</span>
@@ -350,7 +394,60 @@ export default function Navigation() {
           .nav-tablet { display: none; }
           .nav-desktop { display: flex; }
         }
+
+        /* ── Auth controls ── */
+        .nav-signin-btn {
+          padding: 7px 14px;
+          background: var(--color-orange);
+          color: #fff;
+          border: none;
+          border-radius: var(--radius-md);
+          font-family: var(--font-display);
+          font-size: 13px;
+          font-weight: 600;
+          cursor: pointer;
+          transition: background var(--transition-fast);
+          white-space: nowrap;
+        }
+        .nav-signin-btn:hover { background: var(--color-orange-hover); }
+        .nav-user-btn {
+          display: flex;
+          align-items: center;
+          gap: 6px;
+          padding: 7px 10px;
+          background: var(--color-beige);
+          color: var(--color-char);
+          border: none;
+          border-radius: var(--radius-md);
+          font-family: var(--font-display);
+          font-size: 13px;
+          font-weight: 500;
+          cursor: pointer;
+          transition: background var(--transition-fast);
+          max-width: 120px;
+        }
+        .nav-user-btn:hover { background: var(--color-beige-hover); }
+        .nav-user-email {
+          overflow: hidden;
+          text-overflow: ellipsis;
+          white-space: nowrap;
+        }
+        .nav-user-name {
+          flex: 1;
+          overflow: hidden;
+          text-overflow: ellipsis;
+          white-space: nowrap;
+          text-align: left;
+        }
+        .nav-signout-hint {
+          font-size: 11px;
+          color: var(--color-char-muted);
+          white-space: nowrap;
+        }
+        .nav-signin-desktop { color: var(--color-orange); font-weight: 600; }
       `}</style>
+
+            <AuthModal isOpen={authModalOpen} onClose={() => setAuthModalOpen(false)} />
         </>
     );
 }

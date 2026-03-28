@@ -1,129 +1,109 @@
-# Gaffer — Product Requirements Document
+# Gaff3r: Product Requirements Document
 
 > **An AI-powered football match analyst built on Cloudflare's edge infrastructure.**
-> Chat with a sharp, opinionated gaffer about any upcoming match, get data-backed predictions, track your accuracy, and build a longitudinal football intelligence dataset that powers increasingly deep analysis over time.
+> Chat with a sharp, opinionated gaffer about any upcoming match. Get predictions backed by real statistical models, not LLM guesswork. Track your accuracy. Accumulate a football intelligence dataset that powers increasingly deep analysis over time.
 
 ---
 
 ## Table of Contents
 
 1. [Executive Summary](#1-executive-summary)
-2. [Product Evolution & North Star](#2-product-evolution--north-star)
+2. [Product Evolution](#2-product-evolution)
 3. [Problem Statement](#3-problem-statement)
-4. [Product Vision & Principles](#4-product-vision--principles)
+4. [Vision & Principles](#4-vision--principles)
 5. [Target Users](#5-target-users)
 6. [Feature Requirements](#6-feature-requirements)
-7. [System Architecture](#7-system-architecture)
-8. [Cloudflare Component Mapping](#8-cloudflare-component-mapping)
-9. [Data Architecture](#9-data-architecture)
-10. [Data Sources & Integration](#10-data-sources--integration)
-11. [AI & Prompt Engineering](#11-ai--prompt-engineering)
-12. [API Specification](#12-api-specification)
-13. [Frontend Specification](#13-frontend-specification)
-14. [Performance Requirements](#14-performance-requirements)
-15. [Security & Privacy](#15-security--privacy)
-16. [Development Roadmap](#16-development-roadmap)
-17. [Success Metrics](#17-success-metrics)
-18. [Risks & Mitigations](#18-risks--mitigations)
-19. [Repository Structure](#19-repository-structure)
-20. [Submission Checklist](#20-submission-checklist)
+7. [Prediction Model: Dixon-Coles + Monte Carlo](#7-prediction-model-dixon-coles--monte-carlo)
+8. [System Architecture](#8-system-architecture)
+9. [Cloudflare Component Mapping](#9-cloudflare-component-mapping)
+10. [Data Architecture](#10-data-architecture)
+11. [Data Sources & Integration](#11-data-sources--integration)
+12. [AI & Prompt Engineering](#12-ai--prompt-engineering)
+13. [API Specification](#13-api-specification)
+14. [Frontend Specification](#14-frontend-specification)
+15. [Performance Requirements](#15-performance-requirements)
+16. [Security & Privacy](#16-security--privacy)
+17. [Development Roadmap](#17-development-roadmap)
+18. [Success Metrics](#18-success-metrics)
+19. [Risks & Mitigations](#19-risks--mitigations)
+20. [Repository Structure](#20-repository-structure)
 
 ---
 
 ## 1. Executive Summary
 
-**Product Name:** Gaffer
+**Product Name:** Gaff3r
 **Repository:** `cf_ai_gaffer`
 **Platform:** Web (Cloudflare Pages + Workers)
 **LLM:** Llama 3.3 70B via Cloudflare Workers AI
+**Prediction Engine:** Dixon-Coles model + Monte Carlo simulation
 **Primary Data Source:** FPL API (Premier League), football-data.org (other competitions)
-**Target Submission:** Cloudflare Internship Assignment
 
 ### What It Does
 
-Gaffer is a conversational football analyst. Ask about any fixture ("Arsenal vs Chelsea this weekend") and it assembles real match data, reasons through it like a knowledgeable manager reviewing the opposition, and delivers a specific scoreline prediction with transparent reasoning. For Premier League matches, Gaffer pulls enriched data from the FPL API: team strength ratings, player-level form with xG/xA, injury reports, fixture difficulty, and set piece taker information. The system tracks every prediction, resolves them against real results, and maintains a running accuracy profile.
+Gaff3r is a conversational football analyst. Ask about any fixture ("Arsenal vs Chelsea this weekend") and it assembles real match data, reasons through it like a knowledgeable manager reviewing the opposition, and delivers a specific scoreline prediction with transparent reasoning.
 
-The name says it all. In football, the "gaffer" is the boss, the manager, the one who's studied the tape and knows the game inside out. That's the persona: authoritative, data-driven, opinionated, but honest when the call is a tough one.
+For Premier League matches, Gaff3r pulls enriched data from the FPL API: team strength ratings, player-level form with xG/xA, injury reports with availability percentages, fixture difficulty ratings, and set piece taker information. For other European leagues, football-data.org provides standings, form, and recent results.
+
+Predictions are backed by a statistical model (Dixon-Coles) that estimates team attack and defence strengths from historical results, and Monte Carlo simulation that runs 15,000 virtual matches to produce real probability distributions over scorelines. The LLM's role is explaining and contextualizing model outputs, not generating predictions from thin air. The statistical model computes; the LLM narrates.
+
+The name: in football, the "gaffer" is the boss, the manager, the one who's studied the tape and knows the game inside out. That's the persona. The "3" in Gaff3r is intentional.
 
 ### Where It's Going
 
-Gaffer V1 is a match prediction chat built for a Cloudflare internship submission. But the longer-term vision is a football intelligence platform that accumulates structured data over time and powers increasingly deep analysis: multi-gameweek performance breakdowns, season-over-season comparisons, player evolution tracking, and content creation research workflows. The prediction engine is the entry point; the accumulated data pipeline is the real product.
+Gaff3r V1 ships the full prediction engine: conversational analysis, Dixon-Coles + Monte Carlo, accuracy tracking, and a longitudinal data pipeline that logs FPL data weekly. V2 ("Gaff3r Studio") evolves the platform into a general-purpose football content research tool where the prediction engine is one feature among many. Full Studio specification in the companion document: `gaff3r_studio.md`.
 
 ### Core Technical Achievement
 
-The project demonstrates mastery of Cloudflare's AI infrastructure by orchestrating four components in a single request pipeline: Pages serves the frontend, a Worker orchestrates data fetching and prompt assembly, Workers AI runs inference on Llama 3.3, and Durable Objects maintain per-user state. For Premier League matches specifically, the Worker enriches prompts with FPL API data (player injuries, xG, team strength ratings) that generic chatbots simply don't have access to.
+The project orchestrates Cloudflare's AI infrastructure across multiple components: Pages serves the frontend, a Worker orchestrates data fetching, statistical modelling, and prompt assembly, Workers AI runs inference on Llama 3.3, Durable Objects maintain per-user state, D1 stores structured football data and model parameters, and Cron Triggers automate weekly data ingestion and parameter estimation. The prediction pipeline enriches prompts with both FPL API data (player injuries, xG, team strength ratings) and real statistical model outputs (probability distributions, scoreline predictions) that generic chatbots don't have access to.
 
 ---
 
-## 2. Product Evolution & North Star
+## 2. Product Evolution
 
-Gaffer is designed as a staged product. V1 ships this weekend for the internship submission. V2 and V3 extend the platform as personal tools built around recurring needs: match analysis now, content creation research later. Each version layers on top of the previous one without requiring architectural rewrites.
+Gaff3r is designed as a staged product. Each version layers on top of the previous without architectural rewrites.
 
-### V1: Match Prediction Chat (Internship Submission)
+### V1: Match Prediction Engine
 
-**Scope:** Conversational match analyst with predictions and accuracy tracking.
+**Scope:** Conversational match analyst backed by a real statistical model, with accuracy tracking and a longitudinal data pipeline.
 
-**Core loop:** User asks about a match > Worker fetches data > LLM generates analysis with prediction > prediction stored in Durable Object > accuracy tracked over time.
+**Core loop:** User asks about a match > Worker fetches data > Dixon-Coles computes probability distributions > Monte Carlo simulates 15,000 matches > LLM contextualizes model outputs with match data > prediction stored > accuracy tracked over time.
 
-**Data sources:** FPL API (Premier League), football-data.org (La Liga, Bundesliga, Serie A, Ligue 1, Champions League).
+**Data sources:** FPL API (Premier League), football-data.org (other leagues), Club Elo (historical ratings), Football-Data.co.uk (historical results for model fitting).
 
-**Timeline:** One weekend.
+**Prediction method:** Dixon-Coles model estimates team attack/defence parameters from historical results. Monte Carlo simulation produces real probability distributions. Contextual adjustments (key player absence, form divergence, fixture congestion) applied as post-hoc multipliers. LLM narrates and contextualizes the model outputs using FPL match data. Full technical explanation in Section 7.
 
-### V2: Data Accumulation & Integrations (Post-Submission, 2-3 Weeks)
+**Infrastructure:**
+- **D1 database** as the primary structured data store. SQLite semantics for team parameters, historical results, gameweek snapshots.
+- **Weekly FPL data snapshots** via Cron Trigger. Player form, injuries, team strength, fixture results captured every gameweek. This ephemeral data is overwritten in the FPL API after each update; logging it creates a time-series dataset no external API provides.
+- **Vectorize + RAG.** Match analyses and accumulated knowledge embedded for semantic retrieval.
+- **Predictions League integration.** Optional account linking via read-only link codes.
+- **AI Gateway.** Caching, rate limiting, model fallback routing, observability.
+- **Auto-resolution** via daily Cron Trigger.
+- **Streaming responses** for token-by-token rendering.
 
-**Scope:** Begin logging FPL data week-over-week to build a longitudinal dataset. Add Predictions League integration. Enhance PL match analysis with deeper player-level insights.
+**Why the data pipeline matters:** The FPL API only reflects current-state data. By logging snapshots weekly, Gaff3r builds a dataset that no external API provides. By season's end: 38 snapshots showing how every team and player evolved week by week. This accumulated data is the foundation for Studio. Without V1's logging, Studio's arbitrary time-window queries are unanswerable with real data.
 
-**Key additions:**
-- Weekly FPL data snapshots stored in Durable Objects or D1 (Cloudflare's SQL database): player form, injuries, team strength ratings, fixture results. This data is ephemeral in the FPL API and lost after each gameweek update. Capturing it over time is what creates the historical dataset that powers V3.
-- Predictions League account linking via read-only link codes. Gaffer can reference the user's PL prediction history and accuracy in conversation.
-- Automated prediction resolution via Cloudflare Cron Triggers (daily scheduled Worker).
-- Streaming responses for better perceived performance.
+### V2: Gaff3r Studio (The North Star)
 
-**Why V2 matters architecturally:** The FPL API only reflects current-state data. Player form, injury status, and team strength ratings change every gameweek. By logging snapshots weekly, Gaffer builds a dataset that no external API provides: a time-series record of how teams and players evolved across a season. This accumulated data is what lets V3 answer questions like "how did Arsenal perform in the 6 weeks after Saka's injury?" or "compare the top 4 teams' form since the January window." Without V2's logging, those queries are unanswerable with real data.
+**Scope:** General-purpose football analysis research platform. Gaff3r becomes the tool you talk to whenever you're building any kind of football analysis content: a mid-season review, an end-of-season awards video, a post-sacking managerial comparison, a transfer window impact assessment, a title race deep dive, or a relegation battle breakdown.
 
-### V3: Gaffer Studio (The North Star)
+The key insight: almost all football analysis content follows the same underlying pattern. Define a time window or comparison frame, compute metrics across that frame, identify standout data points, and structure them into a narrative. Gaff3r Studio provides the conversational research layer for that pattern regardless of the content piece.
 
-**Scope:** General-purpose football analysis research platform. Gaffer becomes the tool you talk to whenever you're building any kind of football analysis content: a mid-season review, an end-of-season awards video, a post-sacking managerial comparison, a transfer window impact assessment, a title race deep dive, a relegation battle breakdown, or a "how has X team changed since Y event" thread.
+Full specification: see `gaff3r_studio.md`.
 
-The key insight is that almost all football analysis content follows the same underlying pattern: define a time window or comparison frame, compute metrics across that frame, identify standout data points, and structure them into a narrative. Gaffer Studio provides the conversational research layer for that pattern regardless of what the specific content piece is.
+**Feature set summary:**
+- Arbitrary time-window analysis engine
+- Comparison engine (teams, managers, players, time windows)
+- Typed Analysis Template System (8 pre-built templates + custom definitions)
+- Text-to-SQL natural language querying of the D1 football database
+- Player evolution tracking
+- Youth and recruitment analysis
+- Script/talking points generation
+- Exportable data cards via `workers-og`
+- Cloudflare Workflows for multi-step analysis pipelines
 
-**Example workflows:**
-
-*End-of-season grades video:*
-1. "Give me Arsenal's full season breakdown." Gaffer pulls computed data from its accumulated dataset: W/D/L splits, xG trends, key player form trajectories, injury timelines.
-2. "Compare that to last season." Gaffer surfaces the delta: points, goals, new signings' impact.
-3. "Draft the Arsenal section." Structured talking points from computed data.
-
-*Mid-season managerial change analysis:*
-1. "Compare Man United's form under Ten Hag's last 10 games vs Amorim's first 10." Gaffer computes both windows: points/game, xG/game, goals conceded, defensive record, set piece effectiveness.
-2. "Which players improved the most under the new manager?" Per-90 comparison for overlapping players across both windows.
-3. "What's changed tactically?" Formation shifts, possession stats, pressing intensity (where data permits).
-
-*Transfer window impact piece:*
-1. "Show me every January signing in the PL this season and their stats since joining." Minutes, goal contributions, xG, form trajectory post-arrival.
-2. "Which signing has had the biggest impact on their team's results?" Compare team form pre and post the player's integration.
-
-*Title race deep dive (mid-season):*
-1. "Compare the top 4 teams' form since GW15." Side-by-side computed metrics for a specific window.
-2. "Who has the hardest run-in?" Aggregate FDR for remaining fixtures.
-3. "Which squad has the biggest injury concerns right now?" Current injury report across all title contenders.
-
-*Relegation battle breakdown:*
-1. "Give me the bottom 5 teams' form over the last 10 gameweeks." Computed form windows showing who's trending up vs down.
-2. "Which of these teams overperforms their xG the most?" Flags teams living on borrowed time.
-
-The common thread: every content piece requires querying a specific time window, computing real metrics, comparing across teams/players/periods, and structuring findings. Gaffer Studio handles the research and computation; the creator handles the narrative and presentation.
-
-**Feature set:**
-- Arbitrary time-window analysis: query any gameweek range for any team ("Arsenal GW12-GW22"), get computed metrics. Not limited to season-level granularity.
-- Comparison engine: compare any two time windows ("Team A under Manager X vs Manager Y"), any two teams over the same period, or any two players across overlapping minutes.
-- Analysis template system: 8 pre-built templates for common content formats (Team Season Grade, Managerial Comparison, Transfer Window Impact, Title Race, Player Spotlight, Gameweek Window Review, Derby Preview, Monthly Roundup) plus a custom template builder where users define their own categories, metrics, comparison frames, grading scales, and output format. Templates are invokable conversationally or via a library UI. Full schema in Section 6.3.8.
-- Player evolution tracking: per-90 stats over any time window, form curves, injury timeline, minutes trajectory.
-- Youth and recruitment analysis: U21 breakthrough tracking, new signings' pre vs post-arrival performance.
-- Script/talking points generation: structured output adapted to the creator's voice and format preferences
-- Exportable data cards: shareable stat graphics for video editing or social media
-
-**Data moat:** The value in V3 is not the LLM (any chatbot can generate plausible analysis text). It's the accumulated, structured, computed data pipeline underneath. Arbitrary time-window aggregation requires actual calculation, not generation. Managerial comparison across specific gameweek ranges requires structured historical data. Injury timelines across a season require logging ephemeral FPL data weekly. None of this is replicable by prompting ChatGPT.
+**Data moat:** The value in Studio is not the LLM. It's the accumulated, structured, computed data pipeline underneath. Arbitrary time-window aggregation requires actual calculation, not generation. Managerial comparison across specific gameweek ranges requires structured historical data. None of this is replicable by prompting ChatGPT.
 
 ---
 
@@ -131,46 +111,33 @@ The common thread: every content piece requires querying a specific time window,
 
 ### For V1 (Match Predictions)
 
-- Pre-match analysis is scattered across multiple sources (stats sites, podcasts, social media)
-- Generic AI assistants give vague, hedged responses about football because they lack real-time data
-- Prediction tracking is manual; nobody systematically measures how good their instincts are
-- Most "prediction" apps are betting platforms in disguise, not analysis tools
+Pre-match analysis is scattered across multiple sources (stats sites, podcasts, social media). Generic AI assistants give vague, hedged responses about football because they lack real-time data. Prediction tracking is manual; nobody systematically measures their prediction accuracy. Most "prediction" apps are betting platforms in disguise, not analysis tools.
 
-### For V3 (Content Creation Research)
+Beyond the data access problem, every football AI chatbot suffers a fundamental modelling problem: the LLM generates plausible-sounding predictions with no mathematical basis. It doesn't model team strengths, compute probability distributions, or account for the interaction between specific attacks and defences. The result is educated guessing dressed up in confident natural language. Real prediction accuracy requires real statistical models.
 
-- Football content creators spend 3-5 hours per video on data research across 5-6 different platforms, whether the piece is a season review, a mid-season check-in, a managerial comparison, a transfer window assessment, or a title race breakdown
-- Raw stats platforms (FBref, Understat) provide data but no narrative structure, no arbitrary time-window computation, and no comparative framing
-- Professional analytics tools (xvalue.ai, Comparisonator) target clubs and scouts at enterprise pricing, not individual creators
-- LLMs can generate plausible analysis text but hallucinate specific statistics and can't compute metrics across custom gameweek ranges from real data
-- No tool combines computed football data with a conversational research interface that lets you ask "compare X under these conditions vs Y under those conditions" and get real numbers back
+### For V2 (Content Creation Research)
+
+Football content creators spend 3-5 hours per video on data research across 5-6 different platforms, whether the piece is a season review, a mid-season check-in, a managerial comparison, a transfer window assessment, or a title race breakdown. Raw stats platforms (FBref, Understat) provide data but no narrative structure, no arbitrary time-window computation, and no comparative framing. Professional analytics tools (xvalue.ai, Comparisonator) target clubs and scouts at enterprise pricing. No tool combines computed football data with a conversational research interface that lets you ask "compare X under these conditions vs Y under those conditions" and get real numbers back.
 
 ---
 
-## 4. Product Vision & Principles
+## 4. Vision & Principles
 
-### Vision Statement
+### Vision
 
-> Make every football fan feel like they've got a gaffer in their pocket: someone who's watched every match, studied every stat, and isn't afraid to make a call. And for content creation, make Gaffer the research assistant that can answer any analytical question about football with real computed data, not guesswork.
+> Make every football fan feel like they've got a gaffer in their pocket: someone who's watched every match, studied every stat, and isn't afraid to make a call. And for content creation, make Gaff3r the research assistant that can answer any analytical question about football with real computed data, not guesswork.
 
-### Product Principles
+### Principles
 
-**1. Opinionated, Not Hedged**
-The AI takes a position. It doesn't say "it could go either way." It says "Arsenal 2-1, here's why" and acknowledges what could prove it wrong.
+**1. The model computes, the LLM explains.** Statistical predictions come from Dixon-Coles + Monte Carlo. The LLM contextualizes and narrates those numbers using match data (injuries, form, tactical factors). Neither is asked to do the other's job.
 
-**2. Data-First, Not Hallucination-Friendly**
-Every claim is grounded in real data injected into the prompt. The AI never invents statistics. For Premier League matches, this means FPL API data: actual xG numbers, actual injury reports, actual team strength ratings.
+**2. Data-first, not hallucination-friendly.** Every claim is grounded in real data. For PL matches: actual xG numbers, actual injury reports, actual team strength ratings from the FPL API. The AI never invents statistics.
 
-**3. Conversational, Not Dashboard-y**
-The interaction feels like chatting with a knowledgeable manager, not querying a database. The AI has personality: it expresses surprise at form swings, shows enthusiasm about compelling fixtures, and owns it when a prediction was wrong.
+**3. Opinionated, not hedged.** The AI takes a position. "Arsenal 2-1, here's why" with an honest acknowledgment of what could prove it wrong. Conviction backed by reasoning.
 
-**4. Transparent Accuracy**
-Users always see how predictions measure up against reality. Honest feedback loop.
+**4. Accumulate, don't discard.** Every interaction produces data. Predictions are stored. Match data is logged. Player form is tracked over time. The product gets more capable the longer it runs, not because the LLM improves, but because the underlying dataset deepens.
 
-**5. Accumulate, Don't Discard**
-Every interaction produces data. Predictions are stored. Match data is logged. Player form is tracked over time. The product gets more capable the longer it runs, not because the LLM improves, but because the underlying dataset deepens.
-
-**6. Simple Now, Deep Later**
-V1 is a chat box. No signup walls, no complex navigation. Depth layers on progressively across versions without breaking the core experience.
+**5. Simple now, deep later.** V1 is a prediction engine with a chat interface. No signup walls, no complex navigation. The Studio depth (templates, time-window queries, content export) layers on in V2 without breaking the core experience.
 
 ---
 
@@ -178,347 +145,302 @@ V1 is a chat box. No signup walls, no complex navigation. Depth layers on progre
 
 ### V1: The Prediction Enthusiast
 
-- Watches matches regularly, participates in prediction leagues or pub debates
-- Wants data-backed pre-match briefings
-- Values accuracy tracking
-- Age 18-40, comfortable with chat interfaces, likely on mobile
+Watches matches regularly, participates in prediction leagues or pub debates. Wants data-backed pre-match briefings. Values accuracy tracking. Age 18-40, comfortable with chat interfaces, likely on mobile.
 
-### V3: The Football Content Creator (Future)
+### V2: The Football Content Creator
 
-- Makes YouTube videos, TikToks, or Twitter threads about football analysis
-- Content ranges from season reviews to mid-season check-ins, managerial comparisons, transfer assessments, title race breakdowns, relegation previews, and player spotlights
-- Spends hours doing manual research across multiple stats platforms before scripting
-- Wants computed data and structured talking points, not raw stat tables
-- Values accuracy in numbers (can't afford wrong stats in a published video)
-- Needs comparative analysis across arbitrary time windows (not just "this season" but "these specific 10 gameweeks")
+Makes YouTube videos, TikToks, or Twitter threads about football analysis. Content ranges from season reviews to managerial comparisons, transfer assessments, title race breakdowns, and player spotlights. Spends hours doing manual research across multiple stats platforms. Wants computed data and structured talking points. Values accuracy in numbers. Needs comparative analysis across arbitrary time windows.
 
 ### Anti-User
 
-- Someone looking for betting tips or guaranteed outcomes. Gaffer is an analysis tool, not a tipster service.
-- Users expecting real-time match commentary. Gaffer is pre-match and post-season analysis.
+Someone looking for betting tips or guaranteed outcomes. Gaff3r is an analysis tool, not a tipster service. Users expecting real-time match commentary (Gaff3r is pre-match and post-match analysis).
 
 ---
 
 ## 6. Feature Requirements
 
-### 6.1 Core Features (V1 / MVP, P0)
+### 6.1 V1 Features (Match Prediction Engine)
 
 #### 6.1.1 Match Analysis Chat
 
-A conversational interface where users ask about upcoming football matches and receive data-backed analysis with specific predictions.
+A conversational interface where users ask about upcoming matches and receive data-backed analysis with specific predictions.
 
-**User Flow:**
+**User flow:**
 1. User types a natural-language query
-2. System identifies the fixture from the query
-3. System fetches real-time match data. For PL: FPL API (team strength, player form/xG/injuries, fixture difficulty). For other leagues: football-data.org (standings, recent results).
-4. System builds an enriched prompt and sends it to the LLM
-5. AI delivers a structured analysis with a specific scoreline prediction
-6. Prediction is automatically stored in the user's history
+2. System identifies the fixture (team alias mapping + LLM fallback)
+3. System determines data source (FPL API if PL, else football-data.org)
+4. System fetches match data and builds enriched prompt
+5. Dixon-Coles model computes probability distributions; Monte Carlo runs 15,000 simulations
+6. Contextual adjustments applied (injuries, form, congestion)
+7. LLM generates analysis contextualizing model outputs
+8. Prediction automatically stored in user's history
 
-**Acceptance Criteria:**
-- Responds within 8 seconds (including data fetch + LLM inference)
-- Correctly identifies teams from common names, abbreviations, and partial matches
-- Delivers a specific scoreline, not just outcome direction
-- PL matches include player-level detail (key player form, injury news, set piece takers)
-- Non-PL matches provide standings-based analysis from football-data.org
-- Handles missing data gracefully
+**PL matches include:** Player-level detail (key player form with xG/xA, injury news with availability %, set piece takers, FPL fixture difficulty, team strength ratings).
 
-**Edge Cases:**
-- Match already played: provide result and post-match analysis
-- Uncovered league: explain coverage limitations
-- Ambiguous team name ("United"): ask for clarification
-- Non-football question: redirect with personality
+**Non-PL matches include:** Standings, recent form, goal record.
 
-#### 6.1.2 Prediction Storage
+**Edge cases:** Match already played (provide result + analysis), uncovered league (explain limitations), ambiguous team name (ask for clarification), non-football question (redirect with personality).
 
-Every scoreline prediction automatically stored with full context for future resolution.
+#### 6.1.2 Dixon-Coles Prediction Model
 
-**Stored per prediction:** fixture details (teams, competition, date, fixture ID), predicted score and outcome, confidence level, AI reasoning summary, timestamps, status (pending/resolved), actual result (when resolved), accuracy flags (outcome correct, exact score correct).
+Full statistical prediction engine. Team attack/defence parameters estimated weekly via MLE from historical results. Monte Carlo simulation produces real probability distributions. Full technical explanation in Section 7.
 
-#### 6.1.3 Accuracy Tracking
+#### 6.1.3 Contextual Adjustments
 
-Running accuracy statistics: total/resolved/pending, outcome accuracy %, exact score accuracy %, average goal difference, streaks, per-competition breakdown, confidence calibration, monthly trend.
+Post-hoc multipliers applied to Dixon-Coles outputs before simulation:
 
-**Resolution flow:** User triggers via "Check results" button (V1) or automated daily cron (V2). System fetches results for pending predictions, resolves them, recalculates stats.
+| Factor | Mechanism | Data Source |
+|---|---|---|
+| Key player absent | Reduce lambda proportional to player's share of team xG | FPL API (`expected_goals`, `chance_of_playing`) |
+| Home/away split | Team-specific home advantage beyond global gamma | Historical results in D1 |
+| Recent form divergence | Nudge lambda toward last-5 xG/game if it diverges from season avg | FPL gameweek snapshots |
+| Derby/rivalry factor | Some fixtures produce more/fewer goals than expected | H2H history in D1 |
+| Fixture congestion | 3 games in 7 days shows measurable performance drops | FPL fixture dates |
 
-#### 6.1.4 Chat History & Context
+Each multiplier is independently testable against historical accuracy and tunable over time.
+
+#### 6.1.4 Prediction Storage
+
+Every prediction stored with: fixture details, predicted score/outcome, confidence level, AI reasoning summary, model probability distributions, timestamps, status (pending/resolved), actual result (when resolved), accuracy flags (outcome correct, exact score correct).
+
+#### 6.1.5 Accuracy Tracking
+
+Running statistics: total/resolved/pending, outcome accuracy %, exact score accuracy %, average goal difference, streaks, per-competition breakdown, confidence calibration (are "high confidence" predictions actually more accurate?), monthly trend.
+
+#### 6.1.6 Chat History & Context
 
 Last 20 messages stored per user (rolling window). Recent predictions included in prompt context. Favourite team inferred from query patterns.
 
-#### 6.1.5 Quick-Pick Fixtures
+#### 6.1.7 Quick-Pick Fixtures
 
-Upcoming fixtures displayed as tappable chips. FPL fixtures for PL, football-data.org for other leagues. Next 7 days, cached every 6 hours.
+Upcoming fixtures as tappable chips. FPL fixtures for PL, football-data.org for other leagues. Next 7 days, cached every 6 hours.
+
+#### 6.1.8 JSON Mode for Prediction Extraction
+
+Workers AI JSON Mode with schema enforcement on Llama 3.3 extracts structured predictions in the same call as the analysis. Single LLM call, not two.
+
+#### 6.1.9 Club Elo as Additional Signal
+
+Club Elo ratings (free CSV/API from clubelo.com, historical Elo for European clubs since 1960). Elo difference is a strong predictor. Included as prompt context and as a feature in the Dixon-Coles fitting process.
+
+#### 6.1.10 D1 Database
+
+Primary structured data store. D1 provides SQLite semantics, 10GB per database, scale-to-zero pricing. Stores: historical results, team parameters, gameweek snapshots. KV remains as a hot cache layer for API responses. Required for Dixon-Coles parameter fitting and (critically) text-to-SQL queries in Studio.
+
+#### 6.1.11 FPL Data Logging
+
+Weekly cron Worker captures per-gameweek: full standings, per-team strength ratings, per-player form/xG/xA/minutes/goals/assists/status/injury news, fixture results. Stored in D1 keyed by gameweek number and season. This is the critical path to Studio.
+
+#### 6.1.12 Vectorize + RAG
+
+Match analyses and accumulated knowledge embedded into Cloudflare Vectorize using `@cf/baai/bge-base-en-v1.5`. Semantic retrieval enriches future analyses with relevant past context.
+
+#### 6.1.13 Predictions League Integration
+
+Optional account linking. PL generates a read-only link code per user. Gaff3r's Worker stores it in the DO and uses it for server-to-server calls to PL's backend. Data flow: prediction history, aggregate stats, league context. Enables: "You predicted Arsenal 2-1 in your Predictions League too. Your PL accuracy is 58%, 4th in your league."
+
+PL backend addition required: `GET /api/external/user-stats?token={linkCode}`. Build estimate: ~5 hours total.
+
+#### 6.1.14 AI Gateway
+
+Caching (repeated queries), rate limiting per user, model fallback routing (Llama 3.3 > Llama 3.1 8B), observability and cost tracking.
+
+#### 6.1.15 Auto-Resolution + Streaming
+
+Cron Trigger resolves predictions daily. Workers AI streaming (`stream: true`) for token-by-token frontend rendering.
 
 ---
 
-### 6.2 V2 Features (Post-Submission, P1)
+### 6.2 V2 Features (Gaff3r Studio)
 
-#### 6.2.1 FPL Data Logging (Critical Path to V3)
+Fully specified in `gaff3r_studio.md`. Summary of capabilities:
 
-Weekly snapshots of FPL API data stored persistently. Per gameweek: full standings, per-team strength ratings, per-player form/xG/xA/minutes/goals/assists/status/injury news, fixture results with stats.
-
-**Implementation:** Cloudflare Cron Trigger runs a scheduled Worker every Monday. Worker fetches `bootstrap-static/` and `fixtures/`, extracts relevant fields, stores snapshot in D1 or structured KV keyed by gameweek number.
-
-**Why this is the critical path:** The FPL API only reflects current state. Once a gameweek updates, previous data is overwritten. Logging weekly creates a time-series dataset that no external API provides. By season's end, Gaffer has 38 snapshots showing exactly how every team and player evolved. This is the foundation for V3's multi-gameweek analysis and season comparisons.
-
-#### 6.2.2 Predictions League Integration
-
-Optional account linking so Gaffer can reference a user's Predictions League (predictionsleague.xyz) data.
-
-**Integration approach:** PL generates a read-only link code per user. User enters the code in Gaffer's settings panel. Gaffer's Worker stores the code in the DO and includes it in requests to PL's backend.
-
-**Data that flows:** Prediction history (fixture, predicted score, actual score, points), aggregate stats (total predictions, accuracy, rank), league context (name, rank, total players).
-
-**PL backend addition required:** One new endpoint: `GET /api/external/user-stats?token={linkCode}`. Server-to-server call from Gaffer's Worker, bypasses CORS.
-
-**What it enables:** "You predicted Arsenal 2-1 Chelsea in your Predictions League too. Your PL accuracy is 58%, 4th in your league. Let's see if the Gaffer agrees..." Also enables tracking whose predictions are more accurate over time: the user's or the AI's.
-
-**Build estimate:** ~5 hours. 2 hours on PL backend endpoint, 2 hours on Gaffer DO + Worker, 1 hour on settings UI.
-
-#### 6.2.3 Auto-Resolution via Cron Triggers
-
-Daily scheduled Worker fetches completed match results, resolves all pending predictions across users.
-
-#### 6.2.4 Streaming Responses
-
-Stream LLM output to frontend. Workers AI supports streaming; frontend renders tokens as they arrive.
+- **Arbitrary time-window analysis engine:** Query any gameweek range for any team.
+- **Comparison engine:** Any two time windows, teams, managers, or players.
+- **Analysis Template System:** 8 pre-built templates + custom template builder with typed schema.
+- **Text-to-SQL:** Natural language querying of the D1 football database.
+- **Player evolution tracking:** Per-90 stats over any window, form curves, injury timelines.
+- **Youth and recruitment analysis:** U21 breakthrough tracking, new signings pre/post.
+- **Script/talking points generation:** Output adapted to creator's voice and format.
+- **Exportable data cards:** `workers-og` for shareable stat graphics.
+- **Cloudflare Workflows:** Durable multi-step analysis pipelines.
 
 ---
 
-### 6.3 V3 Features (Gaffer Studio, P2)
+## 7. Prediction Model: Dixon-Coles + Monte Carlo
 
-#### 6.3.1 Arbitrary Time-Window Analysis Engine
-Query any gameweek range for any team. "Arsenal GW12-GW22" or "Liverpool's last 8 games" returns computed W/D/L splits, points/game, xG/game, goals scored/conceded, clean sheets, form trajectory. Not limited to full-season or half-season boundaries. Powered by accumulated FPL snapshots, not LLM generation.
+This section explains the statistical prediction system. The key principle: The key principle: **the model computes, the LLM explains**.
 
-#### 6.3.2 Comparison Engine
-Compare any two time windows, teams, managers, or players across overlapping periods. "Ten Hag's last 10 vs Amorim's first 10", "Arsenal vs Man City since GW15", "Saka this season vs last season." The LLM narrates; the data pipeline computes.
+### 7.1 Why Goals Follow a Pattern: The Poisson Distribution
 
-#### 6.3.3 Grading / Awards Framework
-User defines or picks from templates. Gaffer generates data-backed assessments per team per category. Works for end-of-season awards, mid-season reviews, monthly roundups, or any evaluative content format.
+Football goals are rare, independent events happening at a roughly constant rate during a match. The Poisson distribution models exactly this scenario. For a team with an expected goals rate of λ (lambda), the probability of scoring exactly k goals is:
 
-#### 6.3.4 Player Evolution Tracking
-Per-90 stats over any time window, form curves, injury timeline, minutes trajectory. Applicable to breakout players, new signings settling in, returning-from-injury narratives, or decline arcs.
+```
+P(k goals) = λ^k * e^(-λ) / k!
+```
 
-#### 6.3.5 Youth & Recruitment Analysis
-U21 players with significant minutes: breakthrough tracking, minutes trajectory, performance curves. New signings: pre vs post-arrival stats. Queryable at any point in the season.
+Where `λ^k` is the expected rate raised to the power of goals scored, `e^(-λ)` is exponential decay (makes probabilities sum to 1), and `k!` is the factorial (accounts for ordering).
 
-#### 6.3.6 Script/Talking Points Generation
-Structured output adapted to creator's voice and format preferences (stored in DO). Output types: talking points, draft paragraphs, structured outlines for any content format.
+At λ = 1.5 (a decent Premier League attack), the most likely outcome is 1 goal, but there's a ~22% chance of scoring 0 and a ~13% chance of scoring 3+. Even at λ = 2.5 (peak Man City), blanking is ~8% likely. This inherent randomness is why football produces upsets, and the Poisson distribution captures it mathematically.
 
-#### 6.3.7 Exportable Data Cards
-Shareable stat graphics generated server-side. Downloadable for video editing or social media.
+### 7.2 The Naive Model: Independent Poisson
 
-#### 6.3.8 Analysis Template System
+The simplest approach: give each team their own λ, treat them as independent, and multiply probabilities for any scoreline:
 
-The templating system is the structural backbone of Gaffer Studio. It defines what gets computed, how it's organized, and what format the output takes. Every analysis workflow (whether pre-built or custom) runs through a template.
+```
+P(2-1) = P(home scores 2) * P(away scores 1)
+```
 
-**Three layers:**
+This works for most scorelines but systematically underestimates draws at low scores (0-0, 1-1) and overestimates narrow wins (1-0, 0-1). In reality, the two teams' goal counts aren't fully independent: a dominant team pressing high reduces the opponent's scoring chances too. That negative correlation matters most at low scores.
 
-**Layer 1: Pre-Built Templates**
+### 7.3 The Dixon-Coles Fix
 
-Common football content formats, ready to use out of the box. Each defines a set of categories, the metrics computed per category, the comparison frame (if any), and the output structure.
+Published in 1997 by Mark Dixon and Stuart Coles, the fix introduces a single correction factor τ (tau) that adjusts probabilities for the four scorelines where independence breaks down:
 
-| Template | Use Case | Categories |
+| Scoreline | τ formula | Effect when ρ < 0 |
 |---|---|---|
-| **Team Season Grade** | End-of-season or mid-season team evaluation | Overall performance, attack, defence, set pieces, manager impact, best player, biggest disappointment, key stat |
-| **Managerial Comparison** | Before/after a sacking, or comparing two eras | Points/game, xG/game, goals conceded, defensive record, formation usage, results vs top 6, results vs bottom 6 |
-| **Transfer Window Impact** | January or summer window assessment | New signings (minutes, goal contributions, xG, form curve), departures (team form before/after), net spend vs performance delta |
-| **Title/Relegation Race** | Multi-team comparison at any point in season | Form over last N games, remaining fixture difficulty, injury status, xG trend, head-to-head record |
-| **Player Spotlight** | Deep dive on one player across a time window | Per-90 stats, form curve, xG vs actual, minutes trend, comparison to positional peers, pre/post event split (injury, tactical change) |
-| **Gameweek Window Review** | "The story of GW15-GW25" | Biggest movers (up and down), standout individual performances, upsets, form reversals, emerging trends |
-| **Derby/Rivalry Preview** | Pre-match deep dive for a specific fixture | H2H history, form, key player matchups, tactical notes, injury impact, predicted lineups context |
-| **Monthly Roundup** | Regular content cadence | Team of the month, player of the month, biggest upset, form table for the period, stat of the month |
+| 0-0 | 1 - λ * μ * ρ | Probability increases (more goalless draws) |
+| 0-1 | 1 + λ * ρ | Probability decreases |
+| 1-0 | 1 + μ * ρ | Probability decreases |
+| 1-1 | 1 - ρ | Probability increases (more 1-1 draws) |
 
-**Layer 2: Custom Template Definitions**
+For any scoreline where both teams score 2+, τ = 1 (no adjustment). The correction only touches the 2x2 corner of the scoreline matrix. The parameter ρ (rho) is typically around -0.10 to -0.15 in real Premier League data. Negative ρ means: when both teams score few goals, draws are slightly more likely than the independent model predicts.
 
-Users build their own templates by selecting from a menu of category types, metrics, and output preferences. Stored in the user's Durable Object, reusable across sessions.
+The full probability for any scoreline:
 
-```typescript
-interface AnalysisTemplate {
-  id: string;
-  name: string;                         // "My End of Season Grades"
-  description?: string;
-  createdAt: string;
-  lastUsedAt?: string;
-
-  // What's being analyzed
-  scope: TemplateScope;
-
-  // The categories that make up this template
-  categories: TemplateCategory[];
-
-  // Output preferences
-  output: OutputPreferences;
-}
-
-type TemplateScope =
-  | { type: "single_team" }                           // Analyze one team
-  | { type: "multi_team"; count?: number }             // Compare N teams
-  | { type: "single_player" }                          // Player spotlight
-  | { type: "player_comparison"; count?: number }      // Compare N players
-  | { type: "league_wide" }                            // Full league analysis
-  | { type: "custom_group"; teams?: string[] };         // Specific set of teams
-
-interface TemplateCategory {
-  id: string;
-  name: string;                         // "Attack", "Defensive Record", "Youth Integration"
-  weight?: number;                      // For grading: how much this category matters (0-100)
-  metrics: MetricDefinition[];          // What gets computed
-  comparisonFrame?: ComparisonFrame;    // Optional: what to compare against
-  gradingScale?: GradingScale;          // Optional: how to assign a grade
-}
-
-interface MetricDefinition {
-  key: string;                          // "points_per_game", "xg_per_90", "clean_sheet_pct"
-  label: string;                        // "Points Per Game"
-  source: "computed" | "fpl" | "historical";
-  timeWindow?: TimeWindow;              // Override the template-level window
-}
-
-// Pre-defined metric keys the data pipeline supports
-type MetricKey =
-  // Team performance
-  | "wins" | "draws" | "losses" | "points" | "points_per_game"
-  | "goals_scored" | "goals_conceded" | "goal_difference"
-  | "xg_for" | "xg_against" | "xg_difference"
-  | "xg_overperformance"                // Goals scored minus xG
-  | "clean_sheets" | "clean_sheet_pct"
-  | "form_string"                       // "WWDLW"
-  // Positional / context splits
-  | "home_record" | "away_record"
-  | "vs_top_6" | "vs_bottom_6"
-  | "first_half_goals" | "second_half_goals"
-  // Player-level (aggregated across squad)
-  | "top_scorer" | "top_assister" | "top_xg"
-  | "minutes_for_u21" | "u21_goal_contributions"
-  // Set pieces
-  | "set_piece_goals" | "set_piece_goals_conceded"
-  // FPL-specific
-  | "fpl_strength_attack" | "fpl_strength_defence"
-  | "avg_fdr" | "remaining_fdr";
-
-interface TimeWindow {
-  type: "gameweek_range" | "last_n_games" | "date_range" | "full_season"
-       | "pre_event" | "post_event" | "manager_tenure";
-  // For gameweek_range
-  from?: number;
-  to?: number;
-  // For last_n_games
-  count?: number;
-  // For date_range
-  startDate?: string;
-  endDate?: string;
-  // For pre/post event and manager tenure
-  eventDescription?: string;            // "Saka injury", "Amorim appointment"
-  eventGameweek?: number;               // The GW the event occurred
-}
-
-interface ComparisonFrame {
-  type: "previous_period" | "same_period_last_season" | "league_average"
-       | "specific_team" | "specific_window" | "manager_vs_manager";
-  target?: string;                      // Team name, manager name, etc.
-  targetWindow?: TimeWindow;
-}
-
-type GradingScale =
-  | { type: "letter"; scale: "A-F" | "A+-F" }
-  | { type: "numeric"; min: number; max: number }
-  | { type: "custom"; levels: { label: string; threshold: number }[] };
-
-interface OutputPreferences {
-  format: "talking_points" | "draft_paragraphs" | "structured_outline" | "data_table" | "data_cards";
-  tone?: "analytical" | "conversational" | "pundit" | "formal";
-  lengthPerCategory?: "brief" | "standard" | "detailed";
-  includeDataCards?: boolean;
-  includeRawData?: boolean;             // Show the computed numbers alongside narrative
-}
+```
+P(h, a) = Poisson(h; λ) * Poisson(a; μ) * τ(h, a, λ, μ, ρ)
 ```
 
-**Layer 3: Template Execution**
+### 7.4 Team Strength Parameters
 
-When a user invokes a template (pre-built or custom), the execution pipeline:
+Dixon-Coles estimates four parameters per team from historical match data:
 
-1. **Resolve scope:** Determine which teams/players are being analyzed. For "single_team" scope, the user specifies which team. For "league_wide", iterate all 20.
-2. **Compute metrics:** For each category, pull the required metrics from the accumulated data pipeline. Time-window queries hit the GameweekSnapshot store. Player-level queries hit the player snapshot data. All computation is real (not LLM-generated).
-3. **Apply comparisons:** If a category has a comparison frame, compute the same metrics for the comparison target and calculate deltas.
-4. **Apply grading (if applicable):** Use the grading scale to assign grades based on computed metrics. Grading logic can be rule-based (e.g., >2.0 points/game = A) or LLM-assisted (the AI interprets the numbers in context).
-5. **Generate output:** Feed the computed data into the LLM with the output preferences (format, tone, length) to produce the final narrative, talking points, or structured outline.
-6. **Export:** Optionally generate data cards for key findings.
+- **α (alpha):** Attack strength. Higher = more dangerous.
+- **β (beta):** Defence strength. Lower = tighter at the back.
+- **γ (gamma):** Home advantage. Global, same for all teams. Typically adds ~0.25 expected goals.
+- **ρ (rho):** Dependency correction. Global. Typically around -0.13.
 
-**Conversational template invocation:**
+The expected goals for a specific match are computed as interactions:
 
-Users don't need to manually configure templates through a form UI. They can invoke them conversationally:
+```
+λ (home xG) = α_home * β_away * γ
+μ (away xG) = α_away * β_home
+```
 
-- "Run my Team Season Grade template for Arsenal" (uses a saved custom template)
-- "Do a managerial comparison for Man United: Ten Hag's last 12 games vs Amorim's first 12" (uses the pre-built Managerial Comparison template with inferred parameters)
-- "Give me a title race breakdown for the top 4 since Christmas" (pre-built Title Race template, Gaffer infers the top 4 and time window)
-- "Run a monthly roundup for February" (pre-built Monthly Roundup template)
+Your expected goals depend on the interaction between *your* attack strength and *their* defence strength. Arsenal scoring 3 against a team with β = 0.7 (weak defence) tells the model less about Arsenal's α than scoring 2 against a team with β = 1.3 (strong defence). The model untangles these interactions across hundreds of matches.
 
-The LLM parses the user's intent, maps it to a template (or suggests one), resolves parameters, and kicks off the execution pipeline. If parameters are ambiguous, Gaffer asks for clarification.
+**How parameters are learned:** Maximum likelihood estimation (MLE) on historical results (1-3 seasons). The optimizer finds the α, β, γ, ρ that make the observed scorelines most probable under the model. Recent matches are weighted more heavily via exponential time-decay (ξ parameter, typically ~0.001).
 
-**Template management UI (V3):**
+**What it doesn't capture:** The model has no concept of individual players, set pieces vs open play, game state dependency, goal timing, or possession. Arsenal's attack strength is the same whether Saka plays or not. These factors are handled by contextual adjustments (Section 6.2.2) and LLM context, not the statistical model.
 
-A settings/library panel where users can: browse pre-built templates, duplicate and modify them, build custom templates from scratch (category picker, metric selector, comparison frame, grading scale), save/name/reuse templates, and see execution history (which templates they've run, when, with what parameters).
+**Why this still works:** Over a large sample (100+ matches per team), the noise averages out. A team good at set pieces will have scored enough goals that their α reflects it implicitly. Football's outcome space is small (0-5 goals covers 99%+ of matches), so even a simple model with well-calibrated parameters captures the bulk of the variance. Dixon-Coles consistently hits ~50-55% accuracy on three-way outcome prediction, which is close to the theoretical ceiling of 55-62%.
+
+### 7.5 The xG-Adjusted Extension
+
+Instead of fitting the model on actual goals, fit it on expected goals (xG). Actual goals include noise (deflections, goalkeeper errors, worldies). xG strips that noise and measures chance quality. A team creating 2.3 xG/game but scoring 1.5 is underperforming and likely to regress upward. Fitting on xG produces attack/defence parameters that measure chance creation quality rather than goal output, which is more predictive.
+
+The implementation change is minimal: swap `(homeGoals, awayGoals)` for `(homeXG, awayXG)` in the fitting function. Requires accumulated xG data from FPL snapshots (approximately half a season of logged data). Planned after approximately half a season of accumulated data.
+
+### 7.6 Monte Carlo Simulation
+
+With λ, μ, and ρ computed, Gaff3r simulates the match 15,000 times. Each simulation draws random goal counts from the Dixon-Coles distribution:
+
+1. Generate home goals from Poisson(λ)
+2. Generate away goals from Poisson(μ)
+3. Apply Dixon-Coles acceptance/rejection for low-scoring outcomes
+4. Record the result
+
+After 15,000 iterations, count outcomes. The result is a probability distribution: "Arsenal win in 8,700/15,000 simulations (58%), draw in 3,300 (22%), Chelsea win in 3,000 (20%). Most common scoreline: 2-1 (2,130 occurrences, 14.2%)."
+
+**Why simulate when you have exact probabilities?** Three reasons:
+
+1. **League simulation.** To predict "who wins the title?", simulate every remaining match thousands of times. Outcomes compound across matches; the analytical matrix can't handle that.
+2. **Confidence intervals.** "Arsenal win the league in 58% of simulations" is richer than a single probability.
+3. **Scenario modelling.** "What if Saka is out for 5 games?" Adjust λ for those matches and re-simulate the season.
+
+**Performance:** 15,000 simulations run in under 50ms on a Cloudflare Worker. Each simulation is microseconds of Poisson random variate generation and comparison. Well within the 30-second CPU limit.
+
+### 7.7 The Ensemble: Model + LLM
+
+The prediction pipeline feeds model outputs to the LLM as structured context:
+
+```
+STATISTICAL MODEL OUTPUT:
+Outcome probabilities: Home 58.0% | Draw 22.0% | Away 20.0%
+Most likely scoreline: 2-1 (14.2%)
+Other likely scores: 1-1 (11.8%), 1-0 (10.3%), 2-0 (9.1%)
+Model confidence: Medium (no single outcome dominates above 65%)
+```
+
+The LLM's job is to narrate and contextualize: "The model gives Arsenal a 58% chance, which I'd shade closer to 50/50 with Saka doubtful at 25%. Chelsea's counter-attack has been lethal away from home this month, and the model doesn't fully account for that tactical dimension."
+
+Why this ensemble works:
+- **Model alone:** Says "Arsenal 58% to win" but can't explain that Saka's injury changes the dynamic, or that Chelsea always raise their game for big fixtures. Pure numbers, no narrative.
+- **LLM alone:** Narrates beautifully but invents statistics, has no real probability model, and produces overconfident predictions based on vibes. Great storytelling, no rigour.
+- **Model + LLM:** The model provides the mathematical foundation. The LLM provides contextual intelligence and communication. Each does what it's best at.
+
+### 7.8 Staging the Prediction Model
+
+| Stage | Prediction Method | Accuracy Target |
+|---|---|---|
+| Initial | Vanilla Dixon-Coles on historical scorelines + Monte Carlo | ~50-52% three-way |
+| After half-season of data | xG-adjusted Dixon-Coles | ~52-55% three-way |
+| With contextual multipliers | xG-adjusted + key player absence, form, congestion | ~54-57% three-way |
 
 ---
 
-## 7. System Architecture
+## 8. System Architecture
 
-### High-Level Architecture (V1)
+### High-Level Architecture
 
 ```
-┌─────────────────────────────────────────────────────────────────┐
-│                      USER (Browser/Mobile)                      │
-│                                                                 │
-│  ┌───────────────────────────────────────────────────────────┐  │
-│  │              Cloudflare Pages (React SPA)                 │  │
-│  │                                                           │  │
-│  │  ┌─────────────┐  ┌──────────────┐  ┌────────────────┐   │  │
-│  │  │ Chat Window │  │ Predictions  │  │  Accuracy      │   │  │
-│  │  │  "Ask the   │  │   History    │  │   Dashboard    │   │  │
-│  │  │   Gaffer"   │  │              │  │                │   │  │
-│  │  └──────┬──────┘  └──────┬───────┘  └───────┬────────┘   │  │
-│  └─────────┼────────────────┼───────────────────┼────────────┘  │
-│            │                │                   │               │
-└────────────┼────────────────┼───────────────────┼───────────────┘
-             ▼                ▼                   ▼
-┌─────────────────────────────────────────────────────────────────┐
-│                    Cloudflare Worker                             │
-│                 (API Gateway / Orchestrator)                     │
-│                                                                 │
-│  Request Pipeline:                                              │
-│  1. Parse user message                                          │
-│  2. Route to user's Durable Object                              │
-│  3. Load chat history + user state                              │
-│  4. Identify fixture from message                               │
-│  5. Determine data source (FPL API if PL, else football-data)   │
-│  6. Fetch + cache match data from appropriate source            │
-│  7. Assemble enriched prompt (PL or standard template)          │
-│  8. Call Workers AI (Llama 3.3 70B)                             │
-│  9. Parse prediction from response                              │
-│  10. Store prediction + update chat history in DO               │
-│  11. Return response to frontend                                │
-│                                                                 │
-│  ┌──────────────┐ ┌─────────────┐ ┌──────────────────┐         │
-│  │  Workers AI  │ │   Durable   │ │  External APIs   │         │
-│  │              │ │   Object    │ │                   │         │
-│  │ Llama 3.3   │ │  (per user) │ │ FPL API           │         │
-│  │ 70B Instruct│ │             │ │ (PL: xG, injuries │         │
-│  │              │ │ - Chat log  │ │  strength, FDR)   │         │
-│  │              │ │ - Predict-  │ │                   │         │
-│  │              │ │   ions      │ │ football-data.org │         │
-│  │              │ │ - Accuracy  │ │ (other leagues)   │         │
-│  │              │ │ - Prefs     │ │                   │         │
-│  └──────────────┘ └─────────────┘ └──────────────────┘         │
-│                                                                 │
-│  ┌──────────────────────────────────────┐                       │
-│  │  KV Namespace (Cache Layer)          │                       │
-│  │  - FPL bootstrap (6hr TTL)           │                       │
-│  │  - FPL fixtures (1hr TTL)            │                       │
-│  │  - football-data standings (1hr TTL) │                       │
-│  │  - Team alias mappings (30d TTL)     │                       │
-│  └──────────────────────────────────────┘                       │
-└─────────────────────────────────────────────────────────────────┘
+User (Browser/Mobile)
+    |
+    v
+Cloudflare Pages (React SPA)
+    |  POST /api/chat
+    v
+Cloudflare Worker (Orchestrator)
+    |
+    |-- 1. Parse user message
+    |-- 2. Route to user's Durable Object
+    |       -> Returns: chatHistory, predictions, accuracy, preferences
+    |-- 3. Identify fixture (alias map + LLM fallback)
+    |-- 4. Determine data source (FPL if PL, else football-data.org)
+    |-- 5. Fetch match data (cached in KV)
+    |-- 6. Fetch team Dixon-Coles parameters from D1
+    |-- 7. Run Dixon-Coles probability matrix (microseconds)
+    |-- 8. Run Monte Carlo simulation, 15,000 matches (under 50ms)
+    |-- 9. Apply contextual adjustments
+    |-- 10. Build prompt: system + model outputs + match data + chat history
+    |-- 11. Call Workers AI (Llama 3.3, JSON Mode for structured prediction)
+    |-- 12. Store prediction + update chat history in DO
+    |-- 13. Return response
+    |
+    +-- Workers AI (Llama 3.3 70B)
+    +-- Durable Object (per-user state)
+    +-- D1 Database (team params, results, snapshots)
+    +-- KV Namespace (API response cache)
+    +-- Vectorize (RAG corpus)
+    +-- AI Gateway (caching, rate limiting, fallback)
+    |
+    +-- External APIs:
+        +-- FPL API (PL: players, injuries, xG, strength, FDR)
+        +-- football-data.org (other leagues: standings, form)
+        +-- Club Elo (Elo ratings for all European clubs)
+        +-- API-Football (supplementary: H2H, 100 req/day free)
+
+Weekly Cron Worker:
+    +-- Fetch FPL bootstrap-static + fixtures
+    +-- Store gameweek snapshot in D1
+    +-- Re-estimate Dixon-Coles parameters via MLE
+    +-- Store updated team params in D1
+    +-- Resolve pending predictions against real results
+
+Predictions League (Optional):
+    +-- Server-to-server via link code
+    +-- GET /api/external/user-stats?token={linkCode}
 ```
 
 ### Data Source Routing
@@ -526,23 +448,30 @@ A settings/library panel where users can: browse pre-built templates, duplicate 
 ```typescript
 async function fetchMatchContext(fixture: Fixture): Promise<MatchContext> {
   if (fixture.competitionCode === "PL") {
-    return buildContextFromFPL(fixture);   // Richer: player stats, injuries, xG, strength
+    return buildContextFromFPL(fixture);   // Rich: player xG, injuries, strength, FDR
   } else {
-    return buildContextFromFootballData(fixture); // Standings, form, recent results
+    return buildContextFromFootballData(fixture); // Standard: standings, form, results
   }
 }
 ```
 
 ---
 
-## 8. Cloudflare Component Mapping
+## 9. Cloudflare Component Mapping
 
 | Requirement | Component | Implementation |
 |---|---|---|
-| **LLM** | Workers AI | `@cf/meta/llama-3.3-70b-instruct-fp8-fast`, fallback to `llama-3.1-8b-instruct` |
-| **Workflow** | Worker orchestration | Multi-step pipeline: parse > route to DO > determine source > fetch data > build prompt > LLM > parse > store > respond |
+| **LLM** | Workers AI | `@cf/meta/llama-3.3-70b-instruct-fp8-fast`, fallback `llama-3.1-8b-instruct`. JSON Mode for structured output. |
+| **Workflow** | Worker orchestration | Multi-step pipeline: parse > DO > data source > Dixon-Coles > Monte Carlo > adjustments > prompt > LLM > store > respond |
 | **User input** | Cloudflare Pages | React SPA, text chat |
-| **Memory/state** | Durable Objects | One DO per user: chat history, predictions, accuracy, preferences |
+| **Memory/state** | Durable Objects | One DO per user: chat, predictions, accuracy, preferences |
+| **Structured data** | D1 | Team parameters, historical results, gameweek snapshots. SQLite semantics. |
+| **Cache** | KV Namespace | FPL bootstrap (6hr), fixtures (1hr), standings (1hr), team aliases (30d) |
+| **Embeddings** | Vectorize | Match analyses, football knowledge. `bge-base-en-v1.5` embeddings. |
+| **Observability** | AI Gateway | Caching, rate limiting, fallback routing, cost tracking |
+| **Scheduling** | Cron Triggers | Weekly parameter estimation, daily prediction resolution, weekly FPL snapshots |
+| **Analysis pipelines** | Workflows (Studio) | Durable multi-step execution for template-based analysis |
+| **Image generation** | `workers-og` (Studio) | Satori + resvg-wasm for shareable prediction/stat cards |
 
 ```toml
 # wrangler.toml
@@ -553,16 +482,24 @@ binding = "AI"
 name = "GAFFER"
 class_name = "GafferDO"
 
-[[migrations]]
-tag = "v1"
-new_classes = ["GafferDO"]
+[[d1_databases]]
+binding = "DB"
+database_name = "gaffer-football"
+database_id = "..."
+
+[[kv_namespaces]]
+binding = "CACHE"
+id = "..."
+
+[triggers]
+crons = ["0 6 * * 1"]  # Every Monday 6am: parameter estimation + FPL snapshot
 ```
 
 ---
 
-## 9. Data Architecture
+## 10. Data Architecture
 
-### 9.1 Durable Object State Schema
+### 10.1 Durable Object State Schema (Per-User)
 
 ```typescript
 interface UserState {
@@ -575,7 +512,7 @@ interface UserState {
   accuracy: AccuracyStats;
   preferences: UserPreferences;
 
-  // V2: Predictions League integration
+  // Predictions League integration
   predictionsLeague?: {
     linkCode: string;
     lastSynced: string;
@@ -583,9 +520,9 @@ interface UserState {
     plUsername: string;
   };
 
-  // V3: Analysis templates
-  customTemplates?: AnalysisTemplate[];   // User-defined templates (schema in 6.3.8)
-  templateHistory?: {                     // Recent template executions
+  // Studio: Analysis templates
+  customTemplates?: AnalysisTemplate[];
+  templateHistory?: {
     templateId: string;
     templateName: string;
     params: Record<string, unknown>;
@@ -593,23 +530,10 @@ interface UserState {
   }[];
 }
 
-interface ChatMessage {
-  id: string;
-  role: "user" | "assistant";
-  content: string;
-  timestamp: string;
-  metadata?: {
-    fixtureId?: string;
-    predictionId?: string;
-    matchContext?: string;               // "Arsenal vs Chelsea, PL"
-  };
-}
-
 interface Prediction {
   id: string;
   fixtureId: number;
   status: "pending" | "resolved";
-
   homeTeam: string;
   awayTeam: string;
   homeTeamId: number;
@@ -618,26 +542,26 @@ interface Prediction {
   competitionCode: string;
   matchDate: string;
   matchday?: number;
-
   predictedScore: Score;
   predictedOutcome: Outcome;
   confidence: Confidence;
   reasoning: string;
-
+  // Model outputs
+  modelProbabilities?: {
+    homeWin: number;
+    draw: number;
+    awayWin: number;
+    mostLikelyScore: string;
+    mostLikelyScoreProb: number;
+  };
   actualScore?: Score;
   actualOutcome?: Outcome;
-
   outcomeCorrect?: boolean;
   exactScoreCorrect?: boolean;
   goalDifference?: number;
-
   createdAt: string;
   resolvedAt?: string;
 }
-
-interface Score { home: number; away: number; }
-type Outcome = "home" | "draw" | "away";
-type Confidence = "low" | "medium" | "high";
 
 interface AccuracyStats {
   totalPredictions: number;
@@ -650,7 +574,6 @@ interface AccuracyStats {
   avgGoalDifference: number;
   currentStreak: number;
   bestStreak: number;
-
   byCompetition: Record<string, {
     competitionName: string;
     total: number;
@@ -658,376 +581,287 @@ interface AccuracyStats {
     exactScores: number;
     outcomeAccuracy: number;
   }>;
-
   byConfidence: {
     low: { total: number; correct: number; accuracy: number };
     medium: { total: number; correct: number; accuracy: number };
     high: { total: number; correct: number; accuracy: number };
   };
-
   monthlyTrend: { month: string; total: number; correctOutcomes: number; outcomeAccuracy: number }[];
-}
-
-interface UserPreferences {
-  favouriteTeam?: string;
-  favouriteTeamId?: number;
-  preferredLeagues: string[];
-  analysisStyle: "brief" | "detailed";
-  teamQueryCounts: Record<string, number>;
 }
 ```
 
-### 9.2 FPL Match Context (Premier League)
+### 10.2 D1 Schema
+
+```sql
+-- Team Dixon-Coles parameters (updated weekly)
+CREATE TABLE team_params (
+  team_id INTEGER PRIMARY KEY,
+  team_name TEXT NOT NULL,
+  competition_code TEXT NOT NULL,
+  alpha REAL NOT NULL,           -- attack strength
+  beta REAL NOT NULL,            -- defence strength
+  elo_rating REAL,               -- from Club Elo
+  updated_at TEXT NOT NULL
+);
+
+-- Historical match results (for parameter fitting)
+CREATE TABLE match_results (
+  fixture_id INTEGER PRIMARY KEY,
+  home_team_id INTEGER NOT NULL,
+  away_team_id INTEGER NOT NULL,
+  home_goals INTEGER NOT NULL,
+  away_goals INTEGER NOT NULL,
+  home_xg REAL,                  -- when available
+  away_xg REAL,
+  competition_code TEXT NOT NULL,
+  match_date TEXT NOT NULL,
+  gameweek INTEGER,
+  season TEXT NOT NULL
+);
+
+-- Gameweek snapshots (logged weekly by cron)
+CREATE TABLE gameweek_snapshots (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  gameweek INTEGER NOT NULL,
+  season TEXT NOT NULL,
+  captured_at TEXT NOT NULL
+);
+
+CREATE TABLE snapshot_standings (
+  snapshot_id INTEGER REFERENCES gameweek_snapshots(id),
+  team_id INTEGER NOT NULL,
+  position INTEGER,
+  points INTEGER,
+  played INTEGER,
+  won INTEGER, drawn INTEGER, lost INTEGER,
+  goals_for INTEGER, goals_against INTEGER,
+  PRIMARY KEY (snapshot_id, team_id)
+);
+
+CREATE TABLE snapshot_players (
+  snapshot_id INTEGER REFERENCES gameweek_snapshots(id),
+  player_id INTEGER NOT NULL,
+  team_id INTEGER NOT NULL,
+  name TEXT,
+  position TEXT,
+  form REAL,
+  total_points INTEGER,
+  minutes INTEGER,
+  goals INTEGER, assists INTEGER,
+  xg REAL, xa REAL,
+  clean_sheets INTEGER,
+  status TEXT,
+  news TEXT,
+  chance_of_playing REAL,
+  PRIMARY KEY (snapshot_id, player_id)
+);
+
+-- Global model parameters
+CREATE TABLE model_params (
+  id INTEGER PRIMARY KEY,
+  gamma REAL NOT NULL,            -- home advantage
+  rho REAL NOT NULL,              -- dependency correction
+  xi REAL NOT NULL,               -- time decay
+  fitted_at TEXT NOT NULL,
+  match_count INTEGER NOT NULL,
+  log_likelihood REAL
+);
+```
+
+### 10.3 Match Context Schemas
 
 ```typescript
+// PL matches (FPL API enriched)
 interface PLMatchContext {
-  fixture: {
-    id: number;
-    homeTeam: string;
-    awayTeam: string;
-    competition: "Premier League";
-    matchDate: string;
-    matchday: number;
-  };
+  fixture: { id: number; homeTeam: string; awayTeam: string; matchDate: string; matchday: number };
   fplDifficulty: { home: number; away: number };
   homeTeam: PLTeamContext;
   awayTeam: PLTeamContext;
+  // Model outputs
+  modelOutput?: {
+    homeLambda: number;
+    awayMu: number;
+    homeWinProb: number;
+    drawProb: number;
+    awayWinProb: number;
+    topScorelines: { score: string; probability: number }[];
+  };
 }
 
 interface PLTeamContext {
   name: string;
   leaguePosition: number;
-  points: number;
-  played: number;
-  won: number;
-  drawn: number;
-  lost: number;
-  goalsFor: number;
-  goalsAgainst: number;
-  goalDifference: number;
-  strength: {
-    overall: number;
-    attackHome: number;
-    attackAway: number;
-    defenceHome: number;
-    defenceAway: number;
-  };
-  form: string[];
-  formSummary: string;
+  points: number; played: number; won: number; drawn: number; lost: number;
+  goalsFor: number; goalsAgainst: number; goalDifference: number;
+  strength: { overall: number; attackHome: number; attackAway: number; defenceHome: number; defenceAway: number };
+  form: string[]; formSummary: string;
   recentResults: RecentResult[];
   keyPlayers: KeyPlayer[];
   injuries: InjuryReport[];
   setPieceTakers?: string;
+  
+  dixonColesParams?: { alpha: number; beta: number };
+  eloRating?: number;
 }
 
-interface KeyPlayer {
-  name: string;
-  position: string;
-  form: number;
-  goals: number;
-  assists: number;
-  xG: number;
-  xA: number;
-  minutes: number;
-  status: "available" | "injured" | "doubtful" | "suspended";
-}
-
-interface InjuryReport {
-  player: string;
-  status: string;
-  news: string;
-  chanceOfPlaying: number | null;
-}
-```
-
-### 9.3 Standard Match Context (Non-PL)
-
-```typescript
+// Non-PL matches (football-data.org)
 interface StandardMatchContext {
-  fixture: {
-    id: number;
-    homeTeam: string;
-    awayTeam: string;
-    competition: string;
-    competitionCode: string;
-    matchDate: string;
-    matchday?: number;
-  };
+  fixture: { id: number; homeTeam: string; awayTeam: string; competition: string; competitionCode: string; matchDate: string };
   homeTeam: StandardTeamContext;
   awayTeam: StandardTeamContext;
   headToHead?: HeadToHeadContext;
-}
-
-interface StandardTeamContext {
-  name: string;
-  leaguePosition: number;
-  totalTeams: number;
-  points: number;
-  played: number;
-  won: number;
-  drawn: number;
-  lost: number;
-  goalsFor: number;
-  goalsAgainst: number;
-  goalDifference: number;
-  form: string[];
-  formSummary: string;
-  recentResults: RecentResult[];
+  modelOutput?: { /* same as above */ };
 }
 ```
-
-### 9.4 Historical Data Schema (V2, for D1 or structured KV)
-
-Logged once per gameweek by the cron Worker:
-
-```typescript
-interface GameweekSnapshot {
-  gameweek: number;
-  season: string;                       // "2025-26"
-  capturedAt: string;
-
-  standings: {
-    teamId: number;
-    teamName: string;
-    position: number;
-    points: number;
-    played: number;
-    won: number;
-    drawn: number;
-    lost: number;
-    goalsFor: number;
-    goalsAgainst: number;
-  }[];
-
-  teamStrength: {
-    teamId: number;
-    overall: number;
-    attackHome: number;
-    attackAway: number;
-    defenceHome: number;
-    defenceAway: number;
-  }[];
-
-  playerSnapshots: {
-    playerId: number;
-    name: string;
-    teamId: number;
-    position: string;
-    form: number;
-    totalPoints: number;
-    minutes: number;
-    goals: number;
-    assists: number;
-    xG: number;
-    xA: number;
-    cleanSheets: number;
-    status: string;
-    news: string;
-    chanceOfPlaying: number | null;
-  }[];
-
-  fixtureResults: {
-    fixtureId: number;
-    homeTeamId: number;
-    awayTeamId: number;
-    homeGoals: number;
-    awayGoals: number;
-    gameweek: number;
-  }[];
-}
-```
-
-By season's end, Gaffer has 38 snapshots showing exactly how every team and player evolved week by week. No external API provides this longitudinal view. This is the dataset that powers V3's multi-gameweek analysis, season comparisons, and player evolution tracking.
 
 ---
 
-## 10. Data Sources & Integration
+## 11. Data Sources & Integration
 
-### 10.1 Primary: FPL API (Premier League)
+### 11.1 Primary: FPL API (Premier League)
 
 **Base URL:** `https://fantasy.premierleague.com/api/`
-**Auth:** None required. **Rate limits:** Unofficial, no documented limits. Cache aggressively.
-**CORS:** Blocked from browser. Worker calls server-side (no issue).
+**Auth:** None. **Rate limits:** Unofficial, cache aggressively. **CORS:** Blocked from browser; Worker calls server-side.
 
 | Endpoint | Purpose | Cache TTL |
 |---|---|---|
-| `bootstrap-static/` | All teams, players, gameweeks, strength ratings, FDR | 6 hours |
+| `bootstrap-static/` | All teams, players, gameweeks, strength, FDR | 6 hours |
 | `fixtures/` | All PL fixtures with past stats + upcoming | 1 hour |
 | `fixtures/?event={gw}` | Specific gameweek fixtures | 30 minutes |
-| `element-summary/{player_id}/` | Individual player detail | 1 hour |
-| `event/{gw}/live/` | Live gameweek data (for resolution) | 5 minutes |
-| `team/set-piece-notes/` | Set piece taker info | 24 hours |
+| `element-summary/{id}/` | Individual player detail | 1 hour |
+| `event/{gw}/live/` | Live gameweek data (resolution) | 5 minutes |
+| `team/set-piece-notes/` | Set piece takers | 24 hours |
 
-**What FPL gives that football-data.org doesn't:**
-- Team strength ratings (attack/defence, home/away)
-- Fixture difficulty ratings (1-5)
-- Player-level form with xG and xA
-- Injury status with `chance_of_playing_next_round` (0-100)
-- Injury news strings ("Hamstring, expected back 15 Feb")
-- Set piece taker information
+**Unique data FPL provides:** Team strength ratings (attack/defence, home/away), fixture difficulty (1-5), player xG and xA, injury status with `chance_of_playing_next_round` (0-100), injury news strings, set piece takers.
 
-**Note:** `bootstrap-static/` is large (several MB). Cache aggressively in KV, extract only what's needed per request.
+**Note:** `bootstrap-static/` is large (several MB). Cache in KV, extract per-request.
 
-### 10.2 Secondary: football-data.org (Other Competitions)
+### 11.2 Secondary: football-data.org (Other Competitions)
 
-**Auth:** Free API key via email. **Rate limits:** 10 req/min.
+**Auth:** Free API key. **Rate limits:** 10 req/min.
 
-**Coverage:** PL, La Liga (PD), Bundesliga (BL1), Serie A (SA), Ligue 1 (FL1), Champions League (CL), Eredivisie (DED), Primeira Liga (PPL), Championship (ELC).
+**Coverage:** PL, La Liga (PD), Bundesliga (BL1), Serie A (SA), Ligue 1 (FL1), Champions League (CL), Championship (ELC), + others.
 
 | Endpoint | Purpose | Cache TTL |
 |---|---|---|
-| `GET /v4/matches?dateFrom=X&dateTo=Y` | Upcoming fixtures | 6 hours |
+| `GET /v4/matches` | Upcoming fixtures | 6 hours |
 | `GET /v4/competitions/{code}/standings` | League tables | 1 hour |
 | `GET /v4/teams/{id}/matches?status=FINISHED&limit=5` | Recent form | 30 minutes |
-| `GET /v4/matches/{id}` | Match result (for resolution) | 30 minutes |
+| `GET /v4/matches/{id}` | Match result (resolution) | 30 minutes |
 
-### 10.3 Supplementary: API-Football (H2H)
+### 11.3 Club Elo (All European Clubs)
 
-Free tier via RapidAPI, 100 req/day. Used sparingly for head-to-head data on non-PL matches.
+**URL:** `clubelo.com` **Format:** Free CSV/API. **Coverage:** Historical Elo ratings since 1960 for European clubs.
 
-### 10.4 Routing Summary
+Elo difference is a strong, simple predictor. Integrate as additional prompt context and as a feature in the Dixon-Coles fitting process.
 
-| Competition | Source | Data Richness |
+### 11.4 Supplementary: API-Football (H2H)
+
+Free tier via RapidAPI, 100 req/day. Head-to-head data for non-PL matches only.
+
+### 11.5 Historical Sources
+
+| Source | Coverage | Use |
 |---|---|---|
-| **Premier League** | FPL API | High: player xG, injuries, strength, FDR, set pieces |
-| **All other leagues** | football-data.org | Medium: standings, form, recent results |
-| **H2H data** | API-Football | Supplementary: 100 req/day |
+| **Football-Data.co.uk** | 20+ years of match results with betting odds, 25+ leagues (CSV) | Dixon-Coles parameter fitting |
+| **Gaff3r's FPL snapshots** | Current season, weekly granularity | Studio time-window queries |
+| **DataHub.io EPL dataset** | 32 seasons of PL match results | Season-over-season comparison |
+| **Transfermarkt datasets** | Player valuations, transfers, injuries (GitHub) | Studio recruitment analysis |
+| **StatsBomb Open Data** | Event-level data for select competitions | Studio tactical analysis enrichment |
 
-### 10.5 Historical Data Sources (V3)
-
-| Source | Coverage | Access |
-|---|---|---|
-| Gaffer's logged FPL snapshots | Current season, weekly granularity | Internal (V2 cron) |
-| DataHub.io EPL dataset | 32 seasons of match results | Free, open-source |
-| FBref | Deep player/team stats (Opta-sourced) | Free to browse, restrictive scraping ToS |
-
-### 10.6 Team Alias Map
+### 11.6 Team Alias Map
 
 Maps user input to both FPL IDs and football-data.org IDs:
 
 ```typescript
 const TEAM_ALIASES: Record<string, { fplId: number; fdId: number }> = {
-  // PL teams have both IDs
   "arsenal": { fplId: 1, fdId: 57 }, "gunners": { fplId: 1, fdId: 57 },
   "chelsea": { fplId: 6, fdId: 61 }, "blues": { fplId: 6, fdId: 61 },
   "liverpool": { fplId: 12, fdId: 64 }, "reds": { fplId: 12, fdId: 64 },
   "manchester city": { fplId: 13, fdId: 65 }, "man city": { fplId: 13, fdId: 65 },
   "manchester united": { fplId: 14, fdId: 66 }, "man utd": { fplId: 14, fdId: 66 },
   "tottenham": { fplId: 18, fdId: 73 }, "spurs": { fplId: 18, fdId: 73 },
-  // ... full PL + major non-PL teams
-
-  // Non-PL teams: fplId = -1
-  "barcelona": { fplId: -1, fdId: 81 }, "barca": { fplId: -1, fdId: 81 },
+  // ... full PL + major European teams
+  "barcelona": { fplId: -1, fdId: 81 },
   "real madrid": { fplId: -1, fdId: 86 },
-  "bayern munich": { fplId: -1, fdId: 5 }, "bayern": { fplId: -1, fdId: 5 },
-  // ... extend as needed
+  "bayern munich": { fplId: -1, fdId: 5 },
+  // fplId = -1 for non-PL teams
 };
 ```
 
 ---
 
-## 11. AI & Prompt Engineering
+## 12. AI & Prompt Engineering
 
-### 11.1 System Prompt
+### 12.1 System Prompt
 
 ```
-You are Gaffer, a sharp, knowledgeable football analyst with the authority of a
-seasoned manager. You speak with conviction, back up your calls with data, and aren't
-afraid to take a position. Your personality is warm but direct, like a gaffer giving
-a pre-match briefing to someone who genuinely wants to understand the game.
+You are Gaff3r, a sharp, knowledgeable football analyst with the authority of a
+seasoned manager. You speak with conviction, back up your calls with data, and
+aren't afraid to take a position. Your personality is warm but direct, like a
+gaffer giving a pre-match briefing.
 
 CORE RULES:
-1. ONLY cite statistics and facts from the MATCH DATA provided in context.
-   Never invent statistics, historical facts, or player information.
-2. Always deliver a specific scoreline prediction. Not "home win." Give a score.
-3. Always include a confidence level: Low, Medium, or High.
-4. If data is missing or limited, say so explicitly and adjust confidence.
-5. Be opinionated. Take a position. Hedging everything helps no one.
-6. Reference specific recent results when discussing form.
-7. When player data is available (PL matches), reference key players,
-   injuries, and form. "With Saka doubtful at 25%, Arsenal lose their
-   main creative outlet on the right."
-8. Keep responses conversational. This is a chat, not a report.
+1. ONLY cite statistics from the MATCH DATA provided in context. Never invent stats.
+2. When STATISTICAL MODEL OUTPUT is provided, use those probabilities as your
+   foundation. You may adjust your verbal confidence based on contextual factors
+   (injuries, form, tactical matchups) but always reference the model numbers.
+3. Always deliver a specific scoreline prediction with a confidence level.
+4. Be opinionated. Take a position. Hedging everything helps no one.
+5. Reference specific recent results when discussing form.
+6. When player data is available (PL matches), reference key players, injuries,
+   and xG. Flag how absences change the prediction.
+7. Keep responses conversational. 150-250 words. Users can ask follow-ups.
 
-ANALYSIS STRUCTURE (match predictions):
-1. The Gaffer's Call: Your verdict in 1-2 sentences
+ANALYSIS STRUCTURE:
+1. The Gaff3r's Call: Your verdict in 1-2 sentences
 2. Form Check: What the last 5 results tell you (cite specific scores)
 3. The Key Factor: The one thing that most swings this match
 4. Prediction: [Home] [X]-[Y] [Away], Confidence: [Level]
+   Include model probability if available: "(Model: Home 58%, Draw 22%, Away 20%)"
 5. Where I Could Be Wrong: One honest sentence
-
-WHEN PLAYER DATA IS AVAILABLE (PL matches):
-- Mention top in-form players and what they bring
-- Flag significant injuries/doubts and tactical impact
-- Reference xG if it tells a different story from actual goals
-- Note set piece threats if relevant
-
-TONE:
-- Enthusiastic about compelling fixtures
-- Concise. 150-250 words. Users can ask follow-ups.
-- Conversational. Contractions. No corporate speak.
 ```
 
-### 11.2 User Message Template (PL)
+### 12.2 Prompt Templates
 
-```
-USER MESSAGE: "${userMessage}"
+**PL matches** include: FPL difficulty ratings, team strength ratings, key players with xG/xA and form, injury reports with chance-of-playing %, set piece takers, model output.
 
-═══ MATCH DATA (Premier League, Enhanced) ═══
+**Non-PL matches** include: standings, goal record, recent form, H2H if available, model output.
 
-FIXTURE: ${homeTeam} vs ${awayTeam}
-Competition: Premier League (Matchday ${matchday})
-Date: ${matchDate}
-FPL Difficulty: ${homeTeam} rates this ${homeFDR}/5 | ${awayTeam} rates this ${awayFDR}/5
+Both include: user's prediction track record, recent predictions, accuracy stats.
 
-── ${homeTeam.toUpperCase()} ──
-Position: ${homePos}/20 (${homePts} pts, ${homeW}W ${homeD}D ${homeL}L)
-Goals: ${homeGF} scored, ${homeGA} conceded (GD: ${homeGD})
-FPL Strength: Attack ${homeAtkHome} | Defence ${homeDefHome} (at home)
-Last 5: ${homeForm.join(" ")} (${homeFormSummary})
-Recent Results:
-${homeRecent.map(r => `  ${r.result} ${r.score} vs ${r.opponent} (${r.venue})`).join("\n")}
-Key Players:
-${homeKeyPlayers.map(p => `  ${p.name} (${p.position}) | Form: ${p.form} | ${p.goals}G ${p.assists}A | xG: ${p.xG} xA: ${p.xA}`).join("\n")}
-${homeInjuries.length > 0 ? `Injuries:\n${homeInjuries.map(i => `  ${i.player}: ${i.news} (${i.chanceOfPlaying}%)`).join("\n")}` : "No injury concerns."}
-${homeSetPieces ? `Set Pieces: ${homeSetPieces}` : ""}
+### 12.3 JSON Mode
 
-── ${awayTeam.toUpperCase()} ──
-[same structure]
+Workers AI JSON Mode with schema enforcement extracts the structured prediction in the same call as the analysis:
 
-═══ YOUR TRACK RECORD ═══
-Predictions: ${accuracy.totalPredictions} | Resolved: ${accuracy.resolved}
-Outcome: ${accuracy.outcomeAccuracy}% | Exact Score: ${accuracy.scoreAccuracy}%
-Streak: ${accuracy.currentStreak} correct | Best: ${accuracy.bestStreak}
-```
-
-### 11.3 User Message Template (Non-PL)
-
-Same structure without player-level detail, FPL strength, or FDR.
-
-### 11.4 Prediction Extraction Prompt
-
-```
-Extract the prediction from this football analysis as JSON only:
-{"homeScore": <int>, "awayScore": <int>, "outcome": "home"|"draw"|"away",
- "confidence": "low"|"medium"|"high", "reasoning": "<one sentence>"}
-
-Analysis: "${analysisResponse}"
-```
-
-### 11.5 Fixture Identification (Fallback)
-
-```
-From the user's message, identify two football teams. JSON only:
-{"homeTeam": "<from list or null>", "awayTeam": "<from list or null>", "found": bool}
-
-Message: "${userMessage}"
-Available: ${teamList.join(", ")}
+```typescript
+const response = await env.AI.run("@cf/meta/llama-3.3-70b-instruct-fp8-fast", {
+  messages: [...],
+  response_format: {
+    type: "json_schema",
+    json_schema: {
+      type: "object",
+      properties: {
+        analysis: { type: "string" },
+        prediction: {
+          type: "object",
+          properties: {
+            homeScore: { type: "integer" },
+            awayScore: { type: "integer" },
+            outcome: { type: "string", enum: ["home", "draw", "away"] },
+            confidence: { type: "string", enum: ["low", "medium", "high"] },
+            reasoning: { type: "string" }
+          }
+        }
+      }
+    }
+  }
+});
 ```
 
 ---
 
-## 12. API Specification
+## 13. API Specification
 
 **Base:** `https://cf-ai-gaffer.<username>.workers.dev` / `http://localhost:8787`
 
@@ -1036,100 +870,92 @@ Available: ${teamList.join(", ")}
 | `/api/chat` | POST | Full analysis pipeline. Body: `{ message, userId }` |
 | `/api/predictions` | GET | Prediction history. Params: `userId`, `status`, `limit`, `competition` |
 | `/api/accuracy` | GET | Detailed accuracy stats. Params: `userId` |
-| `/api/resolve` | POST | Trigger resolution of pending predictions. Body: `{ userId }` |
+| `/api/resolve` | POST | Trigger resolution. Body: `{ userId }` |
 | `/api/fixtures` | GET | Upcoming fixtures for quick-pick. Params: `competition`, `days` |
-| `/api/link-pl` | POST | (V2) Link Predictions League account. Body: `{ userId, linkCode }` |
+| `/api/link-pl` | POST | Link Predictions League. Body: `{ userId, linkCode }` |
 
-Chat response shape:
-```json
-{
-  "response": "Arsenal at home against Chelsea? ...",
-  "prediction": {
-    "id": "pred_x1y2z3",
-    "homeTeam": "Arsenal FC",
-    "awayTeam": "Chelsea FC",
-    "predictedScore": { "home": 2, "away": 1 },
-    "confidence": "medium",
-    "reasoning": "..."
-  },
-  "accuracy": { "totalPredictions": 15, "outcomeAccuracy": 60, "currentStreak": 3 },
-  "fixtureFound": true,
-  "dataSource": "fpl"
-}
-```
+Chat response includes `dataSource` ("fpl" or "football-data") and `modelOutput` (probabilities and top scorelines).
 
 ---
 
-## 13. Frontend Specification
+## 14. Frontend Specification
 
-**Theme:** Dark mode. "Tactical briefing room meets clean chat." Dark backgrounds (#0A0A0F), pitch-green accents (#22C55E), sharp prediction cards. Not a betting site.
+**Theme:** Dark mode. "Tactical briefing room meets clean chat." Dark backgrounds (#0A0A0F), pitch-green accents (#22C55E). Not a betting site.
 
 **Typography:** Inter (primary), JetBrains Mono (scores/stats).
 
-**Key components:** ChatWindow, MessageBubble, PredictionCard (score prominent, confidence badge), FixtureChips (scrollable upcoming matches), AccuracyBadge (header), PredictionsDrawer (slide-out history), PLLinkPanel (V2 settings).
+**Key components:** ChatWindow, MessageBubble, PredictionCard (score prominent, confidence badge, model probabilities), FixtureChips, AccuracyBadge, PredictionsDrawer, PLLinkPanel.
 
-**Mobile:** Full viewport chat, bottom-sheet drawer, sticky input with safe area, 44px min touch targets.
+**Mobile:** Full viewport chat, bottom-sheet drawer, sticky input, 44px touch targets.
 
 ---
 
-## 14. Performance Requirements
+## 15. Performance Requirements
 
 | Operation | Target | Max |
 |---|---|---|
-| Chat response (full pipeline) | <6s | <10s |
-| Fixture list | <500ms | <1s |
-| Prediction/accuracy loads | <300ms | <500ms |
-| Frontend initial load | <2s | <3s |
+| Chat response (data + model + LLM) | under 7s | under 12s |
+| Dixon-Coles matrix computation | under 1ms | under 5ms |
+| Monte Carlo 15k simulation | under 50ms | under 100ms |
+| Frontend initial load | under 2s | under 3s |
 
 ---
 
-## 15. Security & Privacy
+## 16. Security & Privacy
 
-- V1 auth: client-side UUID v4 in localStorage. No PII collected.
-- API keys as Worker secrets. CORS restricted to Pages domain.
-- Rate limiting: 1 req/sec per userId on chat endpoint.
-- V2: PL link code stored in DO (encrypted at rest by Cloudflare).
+V1 auth: client-side UUID v4 in localStorage. No PII collected. API keys as Worker secrets. CORS restricted to Pages domain. Rate limiting: 1 req/sec per userId on chat endpoint. V2: PL link code stored in DO (Cloudflare encrypts at rest).
 
 ---
 
-## 16. Development Roadmap
+## 17. Development Roadmap
 
-### Phase 1: Foundation (Friday Evening, 3-4 hours)
-Cloudflare setup, Worker + DO + Workers AI hello-world, FPL API client, end-to-end pipeline via curl.
+### V1 Build Plan
 
-### Phase 2: Intelligence (Saturday Morning, 4-5 hours)
-Team aliases, FPL data extraction (PLMatchContext), football-data.org client, prompt templates (PL + standard), prediction extraction, KV caching.
+#### Phase 1: Infrastructure (Week 1)
+Cloudflare account + Wrangler CLI setup. Worker + DO + Workers AI wired up. D1 database created with schema deployed. FPL API client with KV caching. football-data.org client. Club Elo client. End-to-end pipeline testable via curl.
 
-### Phase 3: Frontend (Saturday Afternoon, 4-5 hours)
-React + Tailwind scaffold, chat UI, API integration, PredictionCard, FixtureChips, AccuracyBadge, loading/error states, Pages deploy.
+#### Phase 2: Prediction Model (Week 2)
+Backfill historical match data from Football-Data.co.uk into D1. Implement Dixon-Coles parameter estimation (MLE). Implement Monte Carlo simulation engine. Implement contextual adjustment multipliers. Wire model outputs into prompt context. Cron Trigger for weekly parameter re-estimation.
 
-### Phase 4: Accuracy & Polish (Sunday Morning, 3-4 hours)
-Resolution endpoint, accuracy calculation, PredictionsDrawer, edge case handling.
+#### Phase 3: Chat Intelligence (Week 3)
+Team alias mapping + fixture identification. FPL data extraction (PLMatchContext with players, injuries, xG). Prompt template system (PL + non-PL variants). JSON Mode prediction extraction. Vectorize setup + RAG pipeline. Cron Trigger for daily prediction resolution.
 
-### Phase 5: Submission (Sunday Afternoon, 3-4 hours)
-README.md, PROMPTS.md, end-to-end testing, UI polish, demo recording, GitHub push.
+#### Phase 4: Frontend (Week 4)
+React + Tailwind scaffold. Chat UI with streaming responses. PredictionCard with model probabilities. FixtureChips, AccuracyBadge, PredictionsDrawer. FPL data logging cron. Pages deploy.
+
+#### Phase 5: Integrations + Polish (Week 5)
+Predictions League integration (PL backend endpoint + Gaff3r link flow). AI Gateway setup. Edge case handling. Mobile responsiveness. README.md and PROMPTS.md. End-to-end testing. Demo recording.
+
+### V2: Gaff3r Studio
+See `gaff3r_studio.md` for the 10-week phased build plan.
 
 ---
 
-## 17. Success Metrics
+## 18. Success Metrics
 
-### Submission
-| Criterion | Demonstrated By |
+### V1 Quality
+
+| Metric | Target |
 |---|---|
-| LLM | Llama 3.3 generates match analysis via Workers AI |
-| Workflow | Worker orchestrates pipeline across 4 sources |
-| Chat input | React SPA on Pages |
-| Persistent state | DO stores chat, predictions, accuracy across sessions |
+| PL analyses reference specific players, injuries, xG | 100% |
+| All predictions include specific scorelines | 100% |
+| Model probability distributions shown | 100% |
+| Fixture identification accuracy | >90% |
+| Dixon-Coles three-way outcome accuracy | >50% (above naive baseline) |
+| FPL snapshots captured | 38/38 gameweeks by season end |
+| Mobile responsive at 375px | Yes |
 
-### Quality
-- PL analyses reference specific players, injuries, xG
-- 100% of predictions include specific scorelines
-- >90% fixture identification accuracy
-- Mobile responsive at 375px
+### V2 (Studio)
+
+| Metric | Target |
+|---|---|
+| Text-to-SQL query success rate | >80% |
+| Time-window queries answerable | Any GW range returns computed data |
+| Template execution end-to-end | All 8 pre-built templates functional |
 
 ---
 
-## 18. Risks & Mitigations
+## 19. Risks & Mitigations
 
 | Risk | Mitigation |
 |---|---|
@@ -1137,13 +963,13 @@ README.md, PROMPTS.md, end-to-end testing, UI polish, demo recording, GitHub pus
 | FPL API changes without notice | Defensive parsing; fallback to football-data.org for PL |
 | football-data.org rate limiting | Aggressive KV caching |
 | Team name matching failures | Alias map + LLM fallback |
-| LLM hallucinates statistics | System prompt forbids it; data injected into context |
-| FPL bootstrap too large | Store parsed/filtered version in KV |
-| Weekend timeline tight | Cut P1 ruthlessly; V1 is predictions only |
+| LLM hallucinates statistics | System prompt forbids it; all data provided in context |
+| Dixon-Coles overfits to historical data | Time-decay weighting; regular re-fitting; xG adjustment |
+| FPL bootstrap too large for KV | Store parsed/filtered version |
 
 ---
 
-## 19. Repository Structure
+## 20. Repository Structure
 
 ```
 cf_ai_gaffer/
@@ -1158,21 +984,28 @@ cf_ai_gaffer/
 │   │   ├── services/
 │   │   │   ├── fpl-api.ts             # FPL API client
 │   │   │   ├── football-data.ts       # football-data.org client
+│   │   │   ├── club-elo.ts            # Club Elo client
 │   │   │   ├── match-context.ts       # Routes to correct source
-│   │   │   ├── llm.ts                 # Workers AI
+│   │   │   ├── llm.ts                 # Workers AI + JSON Mode
 │   │   │   ├── fixture-matcher.ts     # Team name resolution
 │   │   │   └── prediction-resolver.ts
+│   │   ├── model/
+│   │   │   ├── dixon-coles.ts         # Parameter estimation + probability matrix
+│   │   │   ├── monte-carlo.ts         # Simulation engine
+│   │   │   ├── adjustments.ts         # Contextual multipliers
+│   │   │   └── poisson.ts             # Poisson utilities
 │   │   ├── prompts/
 │   │   │   ├── system.ts
 │   │   │   ├── templates.ts           # PL + non-PL templates
-│   │   │   └── extraction.ts
+│   │   │   └── extraction.ts          # JSON Mode schema
 │   │   ├── types/
 │   │   │   ├── state.ts
 │   │   │   ├── fpl.ts
 │   │   │   ├── football-data.ts
-│   │   │   └── match-context.ts
+│   │   │   ├── match-context.ts
+│   │   │   └── model.ts              # Dixon-Coles types
 │   │   ├── utils/
-│   │   │   ├── team-aliases.ts        # Dual-ID mappings
+│   │   │   ├── team-aliases.ts
 │   │   │   ├── accuracy.ts
 │   │   │   └── cache.ts
 │   │   └── config.ts
@@ -1185,13 +1018,12 @@ cf_ai_gaffer/
 │   │   ├── components/
 │   │   │   ├── ChatWindow.tsx
 │   │   │   ├── MessageBubble.tsx
-│   │   │   ├── PredictionCard.tsx
+│   │   │   ├── PredictionCard.tsx     # Score, model probabilities, confidence
 │   │   │   ├── FixtureChips.tsx
 │   │   │   ├── AccuracyBadge.tsx
 │   │   │   ├── PredictionsDrawer.tsx
 │   │   │   ├── AccuracyPanel.tsx
-│   │   │   ├── LoadingDots.tsx
-│   │   │   └── ErrorMessage.tsx
+│   │   │   └── LoadingDots.tsx
 │   │   ├── hooks/
 │   │   │   ├── useChat.ts
 │   │   │   ├── usePredictions.ts
@@ -1215,32 +1047,8 @@ cf_ai_gaffer/
 
 ---
 
-## 20. Submission Checklist
-
-### Repository
-- [ ] Repo: `cf_ai_gaffer`
-- [ ] README.md with architecture, setup, deployed link, V2/V3 roadmap
-- [ ] PROMPTS.md documenting all prompts
-- [ ] All work original
-
-### Technical
-- [ ] LLM: Llama 3.3 via Workers AI
-- [ ] Workflow: Multi-step pipeline across 4 sources
-- [ ] Chat: React SPA on Pages
-- [ ] State: DO persists across sessions
-
-### Quality
-- [ ] PL matches show player detail (injuries, xG, form)
-- [ ] Non-PL matches provide standings analysis
-- [ ] Specific scoreline in every prediction
-- [ ] Chat persists across refreshes
-- [ ] Accuracy updates on resolution
-- [ ] Mobile responsive
-- [ ] No API keys in client code
-
----
-
-*Document Version: 2.0*
+*Document Version: 3.0*
 *Author: Divine*
 *Created: March 2026*
-*Project: Cloudflare AI Internship Submission / Gaffer*
+*Project: Gaff3r*
+*Companion: gaff3r_studio.md*

@@ -1,0 +1,14 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(find /c/Users/abeck/Documents/GitHub/cf_ai_gaff3r/worker/src -type f -name *.ts)",
+      "Bash(find /c/Users/abeck/Documents/GitHub/cf_ai_gaff3r/frontend/src -type f \\\\\\(-name *.tsx -o -name *.ts \\\\\\))",
+      "Bash(npx tsc:*)",
+      "Bash(npx wrangler:*)",
+      "Bash(npm install:*)",
+      "Bash(npm run:*)",
+      "Bash(grep -v \"npm warn\\\\|npm notice\\\\|^$\")",
+      "mcp__claude_ai_Cloudflare_Developer_Platform__search_cloudflare_documentation"
+    ]
+  }
+}

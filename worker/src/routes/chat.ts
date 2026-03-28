@@ -18,6 +18,7 @@ import { SYSTEM_PROMPT, buildPLUserMessage, buildStandardUserMessage } from '../
 import { fetchFixtures, fetchBootstrap } from '../services/fpl';
 import { fetchUpcomingMatches } from '../services/football-data';
 import { identifyFixture } from '../services/fixture-matcher';
+import { runPLModel, runStandardModel, formatModelBlock, type SimResult } from '../models';
 
 /**
  * POST /api/chat
@@ -26,7 +27,8 @@ import { identifyFixture } from '../services/fixture-matcher';
 export async function handleChat(
   request: Request,
   userId: string,
-  env: Env
+  env: Env,
+  isAuthenticated = false,
 ): Promise<Response> {
   const body = await request.json() as ChatRequest;
   const { message, gameweek, fixtureId: providedFixtureId } = body;
@@ -92,12 +94,30 @@ export async function handleChat(
     }
   }
 
-  // Step 6: Assemble prompt based on available context
+  // Step 6: Run statistical model and assemble prompt
+  let modelBlock: string | null = null;
+  let simResult: SimResult | null = null;
+  if (matchContext) {
+    try {
+      if (matchContext.type === 'pl') {
+        simResult = runPLModel(matchContext);
+        modelBlock = formatModelBlock(simResult, matchContext.fixture.homeTeam, matchContext.fixture.awayTeam);
+      } else {
+        simResult = runStandardModel(matchContext);
+        if (simResult) {
+          modelBlock = formatModelBlock(simResult, matchContext.fixture.homeTeam, matchContext.fixture.awayTeam);
+        }
+      }
+    } catch (err) {
+      console.warn('Statistical model failed, continuing without it:', err);
+    }
+  }
+
   let userPrompt: string;
   if (matchContext && matchContext.type === 'pl') {
-    userPrompt = buildPLUserMessage(matchContext, message, accuracy);
+    userPrompt = buildPLUserMessage(matchContext, message, accuracy, modelBlock);
   } else if (matchContext && matchContext.type === 'standard') {
-    userPrompt = buildStandardUserMessage(matchContext, message, accuracy);
+    userPrompt = buildStandardUserMessage(matchContext, message, accuracy, modelBlock);
   } else {
     // General football chat — no fixture context available
     userPrompt = `USER MESSAGE: "${message}"\n\n(No specific fixture data available. Provide general football analysis. If they're asking about a match you cannot identify, say so and offer general insights based on what you know.)`;
@@ -175,6 +195,47 @@ export async function handleChat(
       method: 'POST',
       body: JSON.stringify(prediction),
     }));
+
+    // Also persist to D1 for cron-based resolution and cross-user stats
+    const fixtureTs = fixtureItem.kickoffTime
+      ? Math.floor(new Date(fixtureItem.kickoffTime).getTime() / 1000)
+      : null;
+    const isAnon = !isAuthenticated;
+    const outcomeProbsJson = simResult
+      ? JSON.stringify({ home: simResult.homeWinPct, draw: simResult.drawPct, away: simResult.awayWinPct })
+      : null;
+    const modelScorelinesJson = simResult
+      ? JSON.stringify(simResult.topScorelinesWithPct.map(s => ({ score: `${s.home}-${s.away}`, pct: +(s.probability * 100).toFixed(1) })))
+      : null;
+
+    try {
+      await env.DB.prepare(`
+        INSERT OR IGNORE INTO predictions
+          (id, user_id, anon_user_id, home_team, away_team, fixture_id, competition_code,
+           fixture_date, league, predicted_home, predicted_away,
+           outcome_probs_json, model_scorelines_json, reasoning_summary, confidence, status, created_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', unixepoch())
+      `).bind(
+        predId,
+        isAuthenticated ? userId : null,
+        !isAuthenticated ? userId : null,
+        prediction.homeTeam,
+        prediction.awayTeam,
+        resolvedFixtureId,
+        resolvedCompetitionCode,
+        fixtureTs,
+        fixtureItem.competition,
+        prediction.predictedScore.home,
+        prediction.predictedScore.away,
+        outcomeProbsJson,
+        modelScorelinesJson,
+        prediction.reasoning,
+        prediction.confidence,
+      ).run();
+    } catch (dbErr) {
+      // Non-fatal — DO is the source of truth; D1 is for cron resolution
+      console.warn('D1 prediction insert failed:', dbErr);
+    }
 
     storedPrediction = {
       id: predId,

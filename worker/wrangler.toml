@@ -1,6 +1,7 @@
 name = "gaff3r-worker"
 main = "src/index.ts"
 compatibility_date = "2024-12-01"
+compatibility_flags = ["nodejs_compat"]
 
 [durable_objects]
 bindings = [{ name = "USER_STATE", class_name = "UserState" }]
@@ -13,5 +14,43 @@ new_classes = ["UserState"]
 binding = "FPL_CACHE"
 id = "d5fe3844a311424e9e6fb8765807e036"
 
+# Workers AI
+# AI Gateway is configured at runtime via env.AI.run(..., { gateway: { id: "gaff3r-gateway" } })
 [ai]
 binding = "AI"
+remote = true
+
+# D1 Database
+# Create with: wrangler d1 create gaff3r-db
+# Then replace the database_id placeholder below with the returned ID
+[[d1_databases]]
+binding = "DB"
+database_name = "gaff3r-db"
+database_id = "5455879c-e1fb-468b-b1e8-8da67cb44c53"
+
+# Vectorize (RAG)
+# Create with: wrangler vectorize create gaff3r-analyses --dimensions=768 --metric=cosine
+[[vectorize]]
+binding = "VECTORIZE"
+index_name = "gaff3r-analyses"
+# remote = true — enable in Phase 7 after: wrangler vectorize create gaff3r-analyses --dimensions=768 --metric=cosine
+
+# Rate Limiting
+# namespace_id is an arbitrary integer — unique per limit tier
+[[unsafe.bindings]]
+name = "RATE_LIMITER_CHAT"
+type = "ratelimit"
+namespace_id = "1001"
+simple = { limit = 20, period = 60 }
+
+[[unsafe.bindings]]
+name = "RATE_LIMITER_FIXTURES"
+type = "ratelimit"
+namespace_id = "1002"
+simple = { limit = 60, period = 60 }
+
+# Cron Triggers
+# "0 2 * * 1"  = Monday 2am UTC  — weekly FPL snapshot + Dixon-Coles re-fit
+# "0 8 * * *"  = Daily 8am UTC   — prediction resolution
+[triggers]
+crons = ["0 2 * * 1", "0 8 * * *"]

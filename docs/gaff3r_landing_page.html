@@ -1,0 +1,209 @@
+
+<style>
+:root { --g50: #E1F5EE; --g100: #9FE1CB; --g200: #5DCAA5; --g400: #1D9E75; --g600: #0F6E56; --g800: #085041; --g900: #04342C; }
+@media(prefers-color-scheme:dark) {
+  .hero-surface { background: var(--g900) !important; border-color: var(--g600) !important; }
+  .hero-surface h1, .hero-surface .wm { color: var(--g50) !important; }
+  .hero-surface p { color: var(--g200) !important; }
+  .hero-surface .sub { color: var(--g100) !important; }
+  .feat-card { background: var(--color-background-secondary) !important; }
+  .pip-step { background: var(--color-background-secondary) !important; }
+  .pip-num { background: var(--g800) !important; color: var(--g100) !important; }
+  .mock-wrap { background: #0d0d14 !important; }
+  .mock-bubble-ai { background: #141420 !important; }
+  .mock-bubble-user { background: var(--g800) !important; }
+  .pred-card-mock { background: #0f1f18 !important; border-color: #1a4d35 !important; }
+  .studio-surface { background: var(--color-background-secondary) !important; }
+  .studio-badge { background: var(--g800) !important; color: var(--g200) !important; }
+  .cta-surface { background: var(--g900) !important; border-color: var(--g600) !important; }
+  .cta-surface h2 { color: var(--g50) !important; }
+  .cta-surface p { color: var(--g200) !important; }
+  .stat-val { color: var(--g200) !important; }
+}
+</style>
+
+<div style="padding: 1rem 0; max-width: 720px; margin: 0 auto;">
+
+<div class="hero-surface" style="background: var(--g50); border: 0.5px solid var(--g200); border-radius: var(--border-radius-xl); padding: 3rem 2rem; text-align: center; margin-bottom: 2rem;">
+  <div style="display: flex; align-items: center; justify-content: center; gap: 6px; margin-bottom: 1.5rem;">
+    <svg width="32" height="32" viewBox="0 0 32 32" style="flex-shrink: 0;">
+      <circle cx="16" cy="16" r="15" fill="none" stroke="var(--g600)" stroke-width="1.5"/>
+      <circle cx="16" cy="16" r="6" fill="none" stroke="var(--g600)" stroke-width="1"/>
+      <line x1="16" y1="1" x2="16" y2="31" stroke="var(--g600)" stroke-width="0.75" opacity="0.5"/>
+      <circle cx="16" cy="16" r="1.5" fill="var(--g600)"/>
+    </svg>
+    <span class="wm" style="font-family: var(--font-mono); font-size: 22px; font-weight: 500; letter-spacing: -0.5px; color: var(--g800);">gaff<span style="color: var(--g400);">3</span>r</span>
+  </div>
+  <h1 style="font-size: 28px; font-weight: 500; line-height: 1.25; margin: 0 0 12px; color: var(--g900);">Football predictions backed<br/>by real statistical models</h1>
+  <p style="font-size: 15px; line-height: 1.6; color: var(--g800); max-width: 500px; margin: 0 auto 1.5rem;">Not LLM guesswork. Dixon-Coles estimates team strengths from historical data. Monte Carlo runs 15,000 simulations. The AI explains what the numbers mean.</p>
+  <div style="display: flex; gap: 12px; justify-content: center; flex-wrap: wrap;">
+    <div style="background: var(--g600); color: var(--g50); padding: 10px 24px; border-radius: var(--border-radius-md); font-size: 14px; font-weight: 500; cursor: pointer;">Ask the gaffer</div>
+    <div style="border: 0.5px solid var(--g400); color: var(--g800); padding: 10px 24px; border-radius: var(--border-radius-md); font-size: 14px; font-weight: 500; cursor: pointer;">
+      <span class="sub" style="color: var(--g600);">View on GitHub</span>
+    </div>
+  </div>
+</div>
+
+<div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin-bottom: 2rem;">
+  <div style="text-align: center; padding: 1.25rem 1rem; background: var(--color-background-secondary); border-radius: var(--border-radius-lg);">
+    <div class="stat-val" style="font-family: var(--font-mono); font-size: 24px; font-weight: 500; color: var(--g600);">15,000</div>
+    <div style="font-size: 12px; color: var(--color-text-secondary); margin-top: 4px;">Simulations per prediction</div>
+  </div>
+  <div style="text-align: center; padding: 1.25rem 1rem; background: var(--color-background-secondary); border-radius: var(--border-radius-lg);">
+    <div class="stat-val" style="font-family: var(--font-mono); font-size: 24px; font-weight: 500; color: var(--g600);">50ms</div>
+    <div style="font-size: 12px; color: var(--color-text-secondary); margin-top: 4px;">Model computation time</div>
+  </div>
+  <div style="text-align: center; padding: 1.25rem 1rem; background: var(--color-background-secondary); border-radius: var(--border-radius-lg);">
+    <div class="stat-val" style="font-family: var(--font-mono); font-size: 24px; font-weight: 500; color: var(--g600);">38</div>
+    <div style="font-size: 12px; color: var(--color-text-secondary); margin-top: 4px;">Gameweeks of logged data</div>
+  </div>
+</div>
+
+<div class="mock-wrap" style="background: var(--color-background-secondary); border-radius: var(--border-radius-xl); padding: 20px; margin-bottom: 2rem; border: 0.5px solid var(--color-border-tertiary);">
+  <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 16px; padding-bottom: 12px; border-bottom: 0.5px solid var(--color-border-tertiary);">
+    <svg width="16" height="16" viewBox="0 0 32 32" style="flex-shrink: 0;"><circle cx="16" cy="16" r="15" fill="none" stroke="var(--g400)" stroke-width="1.5"/><circle cx="16" cy="16" r="1.5" fill="var(--g400)"/></svg>
+    <span style="font-family: var(--font-mono); font-size: 13px; font-weight: 500; color: var(--color-text-primary);">gaff<span style="color: var(--g400);">3</span>r</span>
+    <span style="margin-left: auto; font-size: 11px; color: var(--color-text-tertiary); font-family: var(--font-mono);">accuracy: 54%</span>
+  </div>
+
+  <div class="mock-bubble-user" style="background: var(--g50); border-radius: 12px 12px 4px 12px; padding: 10px 14px; margin-bottom: 10px; margin-left: 40%; max-width: 60%;">
+    <p style="font-size: 13px; margin: 0; color: var(--g800);">What about Arsenal vs Chelsea this weekend?</p>
+  </div>
+
+  <div class="mock-bubble-ai" style="background: var(--color-background-primary); border: 0.5px solid var(--color-border-tertiary); border-radius: 12px 12px 12px 4px; padding: 12px 14px; margin-bottom: 10px; max-width: 85%;">
+    <p style="font-size: 13px; margin: 0 0 10px; color: var(--color-text-primary); line-height: 1.6;">Arsenal at home against Chelsea? I fancy the Gunners here. Saka's in brilliant form (7.3 FPL form, 0.45 xG/90) and Chelsea's away defence has been leaking. The model agrees...</p>
+
+    <div class="pred-card-mock" style="border: 0.5px solid var(--g200); border-radius: var(--border-radius-md); padding: 12px; margin-bottom: 8px;">
+      <div style="display: flex; justify-content: center; align-items: center; gap: 16px; margin-bottom: 8px;">
+        <span style="font-size: 14px; font-weight: 500; color: var(--color-text-primary);">Arsenal</span>
+        <span style="font-family: var(--font-mono); font-size: 28px; font-weight: 500; color: var(--g400); letter-spacing: 2px;">2 - 1</span>
+        <span style="font-size: 14px; font-weight: 500; color: var(--color-text-primary);">Chelsea</span>
+      </div>
+      <div style="display: flex; justify-content: center; gap: 16px; font-size: 11px; font-family: var(--font-mono);">
+        <span style="color: var(--color-text-secondary);">Home 58%</span>
+        <span style="color: var(--color-text-tertiary);">Draw 22%</span>
+        <span style="color: var(--color-text-tertiary);">Away 20%</span>
+      </div>
+      <div style="display: flex; height: 4px; border-radius: 2px; overflow: hidden; margin-top: 8px; gap: 2px;">
+        <div style="width: 58%; background: var(--g400); border-radius: 2px;"></div>
+        <div style="width: 22%; background: var(--color-border-secondary); border-radius: 2px;"></div>
+        <div style="width: 20%; background: var(--color-border-tertiary); border-radius: 2px;"></div>
+      </div>
+    </div>
+    <p style="font-size: 12px; margin: 0; color: var(--color-text-secondary); line-height: 1.5;">Where I could be wrong: Chelsea's counter has been lethal away this month, and the model doesn't fully weight that tactical dimension.</p>
+  </div>
+
+  <div style="display: flex; gap: 6px; overflow-x: auto; padding: 4px 0;">
+    <div style="flex-shrink: 0; padding: 6px 12px; border-radius: 99px; border: 0.5px solid var(--color-border-tertiary); font-size: 11px; color: var(--color-text-secondary); cursor: pointer;">Man City vs Liverpool</div>
+    <div style="flex-shrink: 0; padding: 6px 12px; border-radius: 99px; border: 0.5px solid var(--color-border-tertiary); font-size: 11px; color: var(--color-text-secondary); cursor: pointer;">Spurs vs Man Utd</div>
+    <div style="flex-shrink: 0; padding: 6px 12px; border-radius: 99px; border: 0.5px solid var(--color-border-tertiary); font-size: 11px; color: var(--color-text-secondary); cursor: pointer;">Barca vs Real Madrid</div>
+  </div>
+</div>
+
+<div style="margin-bottom: 2rem;">
+  <h2 style="font-size: 18px; font-weight: 500; margin: 0 0 1rem;">How predictions work</h2>
+  <div style="display: flex; flex-direction: column; gap: 1px;">
+    <div class="pip-step" style="display: grid; grid-template-columns: 36px 1fr; gap: 12px; align-items: start; padding: 14px; background: var(--color-background-primary); border: 0.5px solid var(--color-border-tertiary); border-radius: var(--border-radius-md) var(--border-radius-md) 0 0;">
+      <div class="pip-num" style="width: 28px; height: 28px; border-radius: 50%; background: var(--g50); display: flex; align-items: center; justify-content: center; font-family: var(--font-mono); font-size: 12px; font-weight: 500; color: var(--g800);">1</div>
+      <div>
+        <p style="font-size: 14px; font-weight: 500; margin: 0 0 2px; color: var(--color-text-primary);">Learn team strengths</p>
+        <p style="font-size: 12px; margin: 0; color: var(--color-text-secondary); line-height: 1.5;">Dixon-Coles MLE estimates attack and defence parameters for every team from historical results. Updated weekly.</p>
+      </div>
+    </div>
+    <div class="pip-step" style="display: grid; grid-template-columns: 36px 1fr; gap: 12px; align-items: start; padding: 14px; background: var(--color-background-primary); border: 0.5px solid var(--color-border-tertiary);">
+      <div class="pip-num" style="width: 28px; height: 28px; border-radius: 50%; background: var(--g50); display: flex; align-items: center; justify-content: center; font-family: var(--font-mono); font-size: 12px; font-weight: 500; color: var(--g800);">2</div>
+      <div>
+        <p style="font-size: 14px; font-weight: 500; margin: 0 0 2px; color: var(--color-text-primary);">Compute expected goals</p>
+        <p style="font-size: 12px; margin: 0; color: var(--color-text-secondary); line-height: 1.5;">Your attack vs their defence, adjusted for home advantage, injuries, and form. Real interaction, not vibes.</p>
+      </div>
+    </div>
+    <div class="pip-step" style="display: grid; grid-template-columns: 36px 1fr; gap: 12px; align-items: start; padding: 14px; background: var(--color-background-primary); border: 0.5px solid var(--color-border-tertiary);">
+      <div class="pip-num" style="width: 28px; height: 28px; border-radius: 50%; background: var(--g50); display: flex; align-items: center; justify-content: center; font-family: var(--font-mono); font-size: 12px; font-weight: 500; color: var(--g800);">3</div>
+      <div>
+        <p style="font-size: 14px; font-weight: 500; margin: 0 0 2px; color: var(--color-text-primary);">Simulate 15,000 matches</p>
+        <p style="font-size: 12px; margin: 0; color: var(--color-text-secondary); line-height: 1.5;">Monte Carlo draws random goals from probability distributions. Produces real win/draw/loss percentages and scoreline probabilities.</p>
+      </div>
+    </div>
+    <div class="pip-step" style="display: grid; grid-template-columns: 36px 1fr; gap: 12px; align-items: start; padding: 14px; background: var(--color-background-primary); border: 0.5px solid var(--color-border-tertiary); border-radius: 0 0 var(--border-radius-md) var(--border-radius-md);">
+      <div class="pip-num" style="width: 28px; height: 28px; border-radius: 50%; background: var(--g50); display: flex; align-items: center; justify-content: center; font-family: var(--font-mono); font-size: 12px; font-weight: 500; color: var(--g800);">4</div>
+      <div>
+        <p style="font-size: 14px; font-weight: 500; margin: 0 0 2px; color: var(--color-text-primary);">The gaffer explains</p>
+        <p style="font-size: 12px; margin: 0; color: var(--color-text-secondary); line-height: 1.5;">Llama 3.3 narrates the model outputs using FPL data: player form, injuries, xG, set pieces. The model computes. The AI explains.</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin-bottom: 2rem;">
+  <div class="feat-card" style="background: var(--color-background-primary); border: 0.5px solid var(--color-border-tertiary); border-radius: var(--border-radius-lg); padding: 1.25rem;">
+    <svg width="20" height="20" viewBox="0 0 20 20" style="margin-bottom: 10px;"><rect x="1" y="3" width="5" height="14" rx="1" fill="var(--g400)" opacity="0.3"/><rect x="7.5" y="6" width="5" height="11" rx="1" fill="var(--g400)" opacity="0.55"/><rect x="14" y="1" width="5" height="16" rx="1" fill="var(--g400)"/></svg>
+    <p style="font-size: 14px; font-weight: 500; margin: 0 0 4px; color: var(--color-text-primary);">Accuracy tracking</p>
+    <p style="font-size: 12px; margin: 0; color: var(--color-text-secondary); line-height: 1.5;">Every prediction stored and resolved. See your outcome accuracy, exact score rate, streaks, and confidence calibration.</p>
+  </div>
+  <div class="feat-card" style="background: var(--color-background-primary); border: 0.5px solid var(--color-border-tertiary); border-radius: var(--border-radius-lg); padding: 1.25rem;">
+    <svg width="20" height="20" viewBox="0 0 20 20" style="margin-bottom: 10px;"><circle cx="10" cy="10" r="8" fill="none" stroke="var(--g400)" stroke-width="1.5"/><path d="M10 4 L10 10 L14 12" fill="none" stroke="var(--g400)" stroke-width="1.5" stroke-linecap="round"/></svg>
+    <p style="font-size: 14px; font-weight: 500; margin: 0 0 4px; color: var(--color-text-primary);">Data logged weekly</p>
+    <p style="font-size: 12px; margin: 0; color: var(--color-text-secondary); line-height: 1.5;">FPL player form, injuries, team strength, and fixture results captured every gameweek. A dataset no external API provides.</p>
+  </div>
+  <div class="feat-card" style="background: var(--color-background-primary); border: 0.5px solid var(--color-border-tertiary); border-radius: var(--border-radius-lg); padding: 1.25rem;">
+    <svg width="20" height="20" viewBox="0 0 20 20" style="margin-bottom: 10px;"><rect x="2" y="2" width="16" height="16" rx="3" fill="none" stroke="var(--g400)" stroke-width="1.5"/><line x1="2" y1="7" x2="18" y2="7" stroke="var(--g400)" stroke-width="1" opacity="0.4"/><line x1="7" y1="7" x2="7" y2="18" stroke="var(--g400)" stroke-width="1" opacity="0.4"/></svg>
+    <p style="font-size: 14px; font-weight: 500; margin: 0 0 4px; color: var(--color-text-primary);">Full league coverage</p>
+    <p style="font-size: 12px; margin: 0; color: var(--color-text-secondary); line-height: 1.5;">Premier League with FPL-enriched data. La Liga, Bundesliga, Serie A, Ligue 1, and Champions League via football-data.org.</p>
+  </div>
+</div>
+
+<div class="studio-surface" style="background: var(--color-background-primary); border: 0.5px solid var(--color-border-tertiary); border-radius: var(--border-radius-xl); padding: 2rem; margin-bottom: 2rem; text-align: center;">
+  <span class="studio-badge" style="display: inline-block; background: var(--g50); color: var(--g800); font-size: 11px; font-weight: 500; padding: 4px 12px; border-radius: 99px; margin-bottom: 12px; font-family: var(--font-mono);">coming soon</span>
+  <h2 style="font-size: 20px; font-weight: 500; margin: 0 0 8px;">gaff<span style="color: var(--g400);">3</span>r studio</h2>
+  <p style="font-size: 14px; color: var(--color-text-secondary); max-width: 460px; margin: 0 auto 1.5rem; line-height: 1.6;">General-purpose football analysis research. Ask any question across any time window and get real computed data back. Built for content creators, powered by the longitudinal dataset Gaff3r accumulates every week.</p>
+  <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; max-width: 480px; margin: 0 auto; text-align: left;">
+    <div style="padding: 10px 12px; background: var(--color-background-secondary); border-radius: var(--border-radius-md);">
+      <p style="font-size: 13px; font-weight: 500; margin: 0 0 2px; color: var(--color-text-primary);">Text-to-SQL queries</p>
+      <p style="font-size: 11px; margin: 0; color: var(--color-text-secondary);">"Best away xG since Christmas?"</p>
+    </div>
+    <div style="padding: 10px 12px; background: var(--color-background-secondary); border-radius: var(--border-radius-md);">
+      <p style="font-size: 13px; font-weight: 500; margin: 0 0 2px; color: var(--color-text-primary);">Analysis templates</p>
+      <p style="font-size: 11px; margin: 0; color: var(--color-text-secondary);">8 pre-built + custom frameworks</p>
+    </div>
+    <div style="padding: 10px 12px; background: var(--color-background-secondary); border-radius: var(--border-radius-md);">
+      <p style="font-size: 13px; font-weight: 500; margin: 0 0 2px; color: var(--color-text-primary);">Comparison engine</p>
+      <p style="font-size: 11px; margin: 0; color: var(--color-text-secondary);">Manager vs manager, era vs era</p>
+    </div>
+    <div style="padding: 10px 12px; background: var(--color-background-secondary); border-radius: var(--border-radius-md);">
+      <p style="font-size: 13px; font-weight: 500; margin: 0 0 2px; color: var(--color-text-primary);">Exportable data cards</p>
+      <p style="font-size: 11px; margin: 0; color: var(--color-text-secondary);">Stat graphics for videos and socials</p>
+    </div>
+  </div>
+</div>
+
+<div style="display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; margin-bottom: 2rem;">
+  <div style="padding: 12px; background: var(--color-background-secondary); border-radius: var(--border-radius-md); text-align: center;">
+    <p style="font-size: 11px; color: var(--color-text-tertiary); margin: 0 0 4px; font-family: var(--font-mono);">Stack</p>
+    <p style="font-size: 12px; color: var(--color-text-secondary); margin: 0;">Cloudflare Workers, Pages, D1, Durable Objects</p>
+  </div>
+  <div style="padding: 12px; background: var(--color-background-secondary); border-radius: var(--border-radius-md); text-align: center;">
+    <p style="font-size: 11px; color: var(--color-text-tertiary); margin: 0 0 4px; font-family: var(--font-mono);">Model</p>
+    <p style="font-size: 12px; color: var(--color-text-secondary); margin: 0;">Dixon-Coles + Monte Carlo + Llama 3.3</p>
+  </div>
+  <div style="padding: 12px; background: var(--color-background-secondary); border-radius: var(--border-radius-md); text-align: center;">
+    <p style="font-size: 11px; color: var(--color-text-tertiary); margin: 0 0 4px; font-family: var(--font-mono);">Data</p>
+    <p style="font-size: 12px; color: var(--color-text-secondary); margin: 0;">FPL API, football-data.org, Club Elo</p>
+  </div>
+  <div style="padding: 12px; background: var(--color-background-secondary); border-radius: var(--border-radius-md); text-align: center;">
+    <p style="font-size: 11px; color: var(--color-text-tertiary); margin: 0 0 4px; font-family: var(--font-mono);">Frontend</p>
+    <p style="font-size: 12px; color: var(--color-text-secondary); margin: 0;">React, Tailwind, TypeScript</p>
+  </div>
+</div>
+
+<div class="cta-surface" style="background: var(--g50); border: 0.5px solid var(--g200); border-radius: var(--border-radius-xl); padding: 2rem; text-align: center;">
+  <h2 style="font-size: 20px; font-weight: 500; margin: 0 0 8px; color: var(--g900);">Ask the gaffer</h2>
+  <p style="font-size: 14px; color: var(--g800); margin: 0 0 1.25rem;">Real probabilities. Real data. Real opinions.</p>
+  <div style="display: inline-block; background: var(--g600); color: var(--g50); padding: 10px 28px; border-radius: var(--border-radius-md); font-size: 14px; font-weight: 500; cursor: pointer;">Start chatting</div>
+</div>
+
+<div style="text-align: center; padding: 1.5rem 0 0.5rem;">
+  <span style="font-family: var(--font-mono); font-size: 13px; color: var(--color-text-tertiary);">gaff<span style="color: var(--g400);">3</span>r</span>
+  <span style="font-size: 12px; color: var(--color-text-tertiary); margin-left: 8px;">Built on Cloudflare's edge</span>
+</div>
+
+</div>

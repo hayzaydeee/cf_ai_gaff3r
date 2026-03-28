@@ -9,6 +9,7 @@ dist/
 .env
 .env.local
 .dev.vars
+.dev.vars.example
 
 # IDE
 .vscode/
