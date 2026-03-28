@@ -1,4 +1,5 @@
 // Cron: Weekly FPL snapshot — runs Monday 2am UTC ("0 2 * * 1")
+import { log } from '../utils/logger';
 // 1. Fetches FPL bootstrap-static (teams + players + events)
 // 2. Writes gameweek_snapshots for all 20 PL teams
 // 3. Writes player_snapshots for all players with ≥1 minute
@@ -40,7 +41,7 @@ interface FPLFixture {
  * Called by the scheduled() handler in index.ts.
  */
 export async function runFplSnapshot(env: Env): Promise<void> {
-  console.log('[fplSnapshot] Starting FPL snapshot...');
+  log('snapshot_captured', { phase: 'start' });
 
   // Fetch bootstrap and all fixtures in parallel
   const [bootstrap, allFixtures] = await Promise.all([
@@ -50,7 +51,7 @@ export async function runFplSnapshot(env: Env): Promise<void> {
 
   const currentEvent = bootstrap.events.find(e => e.is_current);
   if (!currentEvent) {
-    console.warn('[fplSnapshot] No current event found, aborting.');
+    log('snapshot_captured', { phase: 'abort', reason: 'no_current_event' }, 'warn');
     return;
   }
 
@@ -58,7 +59,7 @@ export async function runFplSnapshot(env: Env): Promise<void> {
   const season = deriveSeason();
   const now = Math.floor(Date.now() / 1000);
 
-  console.log(`[fplSnapshot] Snapshotting GW${gw} (${season})`);
+  log('snapshot_captured', { phase: 'processing', gameweek: gw, season });
 
   // 1. Gameweek snapshots (one row per team)
   const teamInserts = bootstrap.teams.map(team =>
@@ -79,7 +80,7 @@ export async function runFplSnapshot(env: Env): Promise<void> {
   );
 
   await env.DB.batch(teamInserts);
-  console.log(`[fplSnapshot] Wrote ${teamInserts.length} gameweek_snapshots`);
+  log('snapshot_captured', { phase: 'teams', count: teamInserts.length });
 
   // 2. Player snapshots (players with ≥ 45 minutes this season)
   const activePlayers = bootstrap.elements.filter(p => p.minutes >= 45);
@@ -105,7 +106,7 @@ export async function runFplSnapshot(env: Env): Promise<void> {
   for (let i = 0; i < playerInserts.length; i += 100) {
     await env.DB.batch(playerInserts.slice(i, i + 100));
   }
-  console.log(`[fplSnapshot] Wrote ${playerInserts.length} player_snapshots`);
+  log('snapshot_captured', { phase: 'players', count: playerInserts.length });
 
   // 3. Historical results — upsert finished fixtures for this GW
   const gwFixtures = allFixtures.filter(f => f.event === gw && f.finished);
@@ -130,11 +131,11 @@ export async function runFplSnapshot(env: Env): Promise<void> {
 
     if (resultInserts.length > 0) {
       await env.DB.batch(resultInserts);
-      console.log(`[fplSnapshot] Wrote ${resultInserts.length} historical_results`);
+      log('snapshot_captured', { phase: 'results', count: resultInserts.length });
     }
   }
 
-  console.log('[fplSnapshot] Complete.');
+  log('snapshot_captured', { phase: 'complete', gameweek: gw });
 }
 
 // ── Helpers ──

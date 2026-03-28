@@ -74,7 +74,12 @@ export function useChat(gameweek: number | null, fixtureId?: number) {
 
     try {
       for await (const chunk of sendChatStream(trimmed, gameweek, activeFixtureId)) {
-        if (chunk.type === 'chunk') {
+        if (chunk.type === 'meta') {
+          // Received before first chunk — tells the UI whether a model block is coming
+          setAllMessages(prev => prev.map(m =>
+            m.id === streamId ? { ...m, hasModel: chunk.hasModel, intent: chunk.intent } : m
+          ));
+        } else if (chunk.type === 'chunk') {
           setAllMessages(prev => prev.map(m =>
             m.id === streamId ? { ...m, content: m.content + chunk.text } : m
           ));

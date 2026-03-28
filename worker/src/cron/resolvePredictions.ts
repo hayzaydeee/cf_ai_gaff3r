@@ -5,6 +5,7 @@
 
 import type { Env } from '../types/env';
 import type { PredictionRow } from '../db/schema';
+import { log } from '../utils/logger';
 
 const FD_BASE = 'https://api.football-data.org/v4';
 
@@ -27,7 +28,7 @@ interface FDMatchResult {
  * Called by the scheduled() handler in index.ts.
  */
 export async function runResolvePredictions(env: Env): Promise<void> {
-  console.log('[resolvePredictions] Starting resolution run...');
+  log('prediction_resolved', { phase: 'start' });
 
   const nowTs = Math.floor(Date.now() / 1000);
   const cutoffTs = nowTs - GRACE_PERIOD_SECONDS;
@@ -46,7 +47,7 @@ export async function runResolvePredictions(env: Env): Promise<void> {
   `).bind(cutoffTs, BATCH_LIMIT).all<PredictionRow>();
 
   const pending = result.results ?? [];
-  console.log(`[resolvePredictions] Found ${pending.length} candidates`);
+  log('prediction_resolved', { phase: 'candidates', count: pending.length });
 
   if (pending.length === 0) return;
 
@@ -58,7 +59,6 @@ export async function runResolvePredictions(env: Env): Promise<void> {
       const match = await fetchMatchResult(pred.fixture_id!, env.FOOTBALL_DATA_API_KEY);
 
       if (match.status !== 'FINISHED') {
-        console.log(`[resolvePredictions] Fixture ${pred.fixture_id} not finished yet (${match.status}), skipping`);
         continue;
       }
 
@@ -66,7 +66,7 @@ export async function runResolvePredictions(env: Env): Promise<void> {
       const actualAway = match.score.fullTime.away;
 
       if (actualHome === null || actualAway === null) {
-        console.warn(`[resolvePredictions] Fixture ${pred.fixture_id} has null score, marking unresolvable`);
+        log('prediction_resolved', { phase: 'unresolvable', predId: pred.id, fixtureId: pred.fixture_id }, 'warn');
         await env.DB.prepare(`UPDATE predictions SET status = 'unresolvable' WHERE id = ?`)
           .bind(pred.id).run();
         continue;
@@ -90,23 +90,27 @@ export async function runResolvePredictions(env: Env): Promise<void> {
         WHERE id = ?
       `).bind(actualHome, actualAway, outcomeCorrect, exactScoreCorrect, pred.id).run();
 
-      console.log(
-        `[resolvePredictions] Resolved ${pred.home_team} vs ${pred.away_team}: ` +
-        `predicted ${pred.predicted_home}-${pred.predicted_away}, ` +
-        `actual ${actualHome}-${actualAway} ` +
-        `(outcome: ${outcomeCorrect ? '✓' : '✗'}, exact: ${exactScoreCorrect ? '✓' : '✗'})`
-      );
+      log('prediction_resolved', {
+        phase: 'resolved',
+        predId: pred.id,
+        homeTeam: pred.home_team,
+        awayTeam: pred.away_team,
+        predicted: `${pred.predicted_home}-${pred.predicted_away}`,
+        actual: `${actualHome}-${actualAway}`,
+        outcomeCorrect: !!outcomeCorrect,
+        exactScoreCorrect: !!exactScoreCorrect,
+      });
       resolved++;
 
       // Respect football-data.org free-tier rate limit: ~6 req/min
       await sleep(10_000);
     } catch (err) {
-      console.error(`[resolvePredictions] Error resolving prediction ${pred.id}:`, err);
+      log('prediction_resolved', { phase: 'error', predId: pred.id, error: String(err) }, 'error');
       errors++;
     }
   }
 
-  console.log(`[resolvePredictions] Done — resolved: ${resolved}, errors: ${errors}`);
+  log('prediction_resolved', { phase: 'complete', resolved, errors });
 }
 
 // ── Helpers ──

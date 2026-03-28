@@ -15,6 +15,7 @@ import type { ChatMessage, Prediction, AccuracyStats, Outcome } from '../types/a
 import { fetchMatchContext } from '../services/match-context';
 import { runAnalysis, runAnalysisStreaming } from '../services/ai';
 import { classifyIntent, shouldRunModel, buildIntentHint } from '../services/intentClassifier';
+import { log } from '../utils/logger';
 import { SYSTEM_PROMPT, buildPLUserMessage, buildStandardUserMessage } from '../prompts/gaffer';
 import { fetchFixtures, fetchBootstrap } from '../services/fpl';
 import { fetchUpcomingMatches } from '../services/football-data';
@@ -235,7 +236,8 @@ export async function handleChat(
       simResult: simResult ?? undefined,
       adjustmentNotes: adjustmentNotes.length > 0 ? adjustmentNotes : undefined,
     };
-    const streamBody = await runAnalysisStreaming(env, SYSTEM_PROMPT, userPrompt, extraDone, runPostProcessing);
+    const streamMeta = { hasModel: shouldRunModel(intent), intent: intent ?? 'result' };
+    const streamBody = await runAnalysisStreaming(env, SYSTEM_PROMPT, userPrompt, extraDone, runPostProcessing, streamMeta);
     return new Response(streamBody, {
       headers: {
         'Content-Type': 'text/event-stream',
@@ -371,6 +373,16 @@ export async function handleChat(
       // Non-fatal — DO is the source of truth; D1 is for cron resolution
       console.warn('D1 prediction insert failed:', dbErr);
     }
+
+    log('prediction_made', {
+      userId,
+      predId,
+      fixtureId: resolvedFixtureId,
+      homeTeam: prediction.homeTeam,
+      awayTeam: prediction.awayTeam,
+      confidence: prediction.confidence,
+      authenticated: isAuthenticated,
+    });
 
     storedPrediction = {
       id: predId,

@@ -20,6 +20,7 @@
 11. [Data Sources & Integration](#11-data-sources--integration)
 12. [AI & Prompt Engineering](#12-ai--prompt-engineering)
     - [12.X Prediction Intelligence: Typed Sub-types & Visual Output](#12x-prediction-intelligence-typed-sub-types--visual-output)
+    - [12.Y Intent Classification & Streaming Pipeline](#12y-intent-classification--streaming-pipeline-v1--implemented)
 13. [API Specification](#13-api-specification)
 14. [Frontend Specification](#14-frontend-specification)
 15. [Performance Requirements](#15-performance-requirements)
@@ -980,6 +981,48 @@ User message
 - **Infrastructure:** Requires Workers AI Gateway analytics to measure classifier accuracy. Need baseline data from V1/V2 intent handling first.
 - **Value ceiling:** Most intent ambiguity is solved by Approach 1's sub-type signals. Two-pass is worth it when Approach 1 misfire rate exceeds ~10% of sessions — that's a V3 problem.
 - **Specialist prompts:** The real unlock of Approach 3 is per-intent specialist system prompts (a scorer specialist prompt optimised for that task, a lineup specialist, etc.). These require separate prompt engineering and evaluation cycles.
+
+---
+
+### 12.Y Intent Classification & Streaming Pipeline (V1 — Implemented)
+
+#### Intent Classifier
+
+**File:** `worker/src/services/intentClassifier.ts`
+
+A lightweight keyword classifier (`classifyIntent`) runs before the LLM call on every `/api/chat` request. It returns `'scorer' | 'lineup' | 'btts' | 'analyse' | null`, where `null` means "run the full result prediction pipeline".
+
+| Intent | Monte Carlo | Intent hint injected | Model block skeleton | Model block on done |
+|---|---|---|---|---|
+| `null` (result / general) | ✅ runs | none | ✅ shown | ✅ if simResult present |
+| `'scorer'` | ❌ skipped | `DETECTED INTENT: scorer` | ❌ suppressed | ❌ never |
+| `'lineup'` | ❌ skipped | `DETECTED INTENT: lineup` | ❌ suppressed | ❌ never |
+| `'btts'` | ❌ skipped | `DETECTED INTENT: btts` | ❌ suppressed | ❌ never |
+| `'analyse'` | ❌ skipped | `DETECTED INTENT: analyse` | ❌ suppressed | ❌ never |
+
+The intent hint is injected into the user message template directly above the match data block. This removes the ambiguity the model faces when rich statistical context is present — it no longer has to infer the response type from phrasing alone.
+
+#### SSE Meta Event
+
+**File:** `worker/src/services/ai.ts` — `runAnalysisStreaming`
+
+The very first SSE event in every stream is a `meta` event, emitted before any AI content arrives at the frontend:
+
+```json
+{ "type": "meta", "hasModel": true, "intent": "result" }
+```
+
+The frontend (`useChat.ts`) receives this and immediately sets `hasModel` and `intent` on the streaming message state. `AnalysisBubble` gates the loading skeleton on `message.hasModel !== false` — so for all non-result queries, no skeleton ever appears. For result queries, the skeleton appears as expected and transitions to the full Dixon-Coles block on done.
+
+The skeleton itself no longer carries the "Dixon-Coles · Monte Carlo · 15,000 simulations" label — only the fully-materialised block does. This prevents the label from appearing briefly and then disappearing if the response turns out not to be a result prediction.
+
+#### Safety Net (Approach B)
+
+After the stream completes, `simResult` and `adjustmentNotes` are stripped from the `done` event if `typedPrediction.type !== 'result'`. This handles the edge case where the classifier returned `null` (ran the model) but the LLM produced a non-result sub-type. Without this, the Dixon-Coles block would render alongside a scorer or lineup card.
+
+#### Premium Lineup Visual (V2 Roadmap)
+
+The current `LineupGrid` component renders formation + key picks as a list. A V2 upgrade should render a top-down pitch graphic with player avatars/names in formation positions (FotMob/Sofascore style). Blocked in V1: FPL only exposes key player data, not a full 11-player squad list.
 
 ---
 

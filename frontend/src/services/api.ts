@@ -187,6 +187,7 @@ export function sendChat(message: string, gameweek: number, fixtureId?: number):
 }
 
 export type ChatStreamChunk =
+  | { type: 'meta'; hasModel: boolean; intent: string }
   | { type: 'chunk'; text: string }
   | { type: 'done'; response: string; prediction: ChatResponseData['prediction']; accuracy: ChatResponseData['accuracy']; fixtureFound: boolean; identifiedFixture: ChatResponseData['identifiedFixture']; simResult?: SimResult; adjustmentNotes?: string[]; typedPrediction?: TypedPrediction }
   | { type: 'error'; error: string };

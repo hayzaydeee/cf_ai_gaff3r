@@ -11,6 +11,7 @@ import { getAuth, getSessionUserId } from './auth';
 import { runFplSnapshot } from './cron/fplSnapshot';
 import { runResolvePredictions } from './cron/resolvePredictions';
 import { isPromptInjection, sanitiseInput } from './utils/security';
+import { log } from './utils/logger';
 
 export { UserState } from './durable-objects/user-state';
 
@@ -48,16 +49,21 @@ const USER_ID_REGEX = /^usr_[a-zA-Z0-9_-]{1,59}$/;
 
 export default {
   async scheduled(controller: ScheduledController, env: Env): Promise<void> {
+    const cronName = controller.cron === '0 2 * * 1' ? 'fpl_snapshot'
+      : controller.cron === '0 8 * * *' ? 'resolve_predictions'
+      : 'unknown';
+    log('cron_started', { cron: controller.cron, name: cronName });
     try {
       if (controller.cron === '0 2 * * 1') {
         await runFplSnapshot(env);
       } else if (controller.cron === '0 8 * * *') {
         await runResolvePredictions(env);
       } else {
-        console.warn(`[scheduled] Unknown cron expression: ${controller.cron}`);
+        log('cron_started', { cron: controller.cron, name: 'unknown' }, 'warn');
       }
+      log('cron_completed', { cron: controller.cron, name: cronName });
     } catch (err) {
-      console.error('[scheduled] Cron handler threw:', err);
+      log('cron_started', { cron: controller.cron, name: cronName, error: String(err) }, 'error');
     }
   },
 
@@ -166,6 +172,7 @@ export default {
         // Rate-limit chat by userId (authenticated or anonymous)
         const { success: chatOk } = await env.RATE_LIMITER_CHAT.limit({ key: userId });
         if (!chatOk) {
+          log('rate_limit_hit', { userId, route: 'chat' }, 'warn');
           return secured(errorResponse('Rate limit exceeded — you\'re sending messages too quickly', 429), origin);
         }
 
@@ -201,6 +208,7 @@ export default {
         // Sanitise and check for prompt injection before hitting the LLM
         const cleanMessage = sanitiseInput(message.trim());
         if (isPromptInjection(cleanMessage)) {
+          log('injection_blocked', { userId, severity: 'warn' }, 'warn');
           return secured(errorResponse('Invalid message content', 400), origin);
         }
 

@@ -218,6 +218,9 @@ function extractPredictionFromText(response: string): PredictionData | null {
  *
  * @param extraDoneData  Extra fields merged into the `done` event (accuracy, fixtureFound, etc.)
  * @param onComplete     Called after full text is assembled (store to DO/D1/Vectorize)
+ * @param metaData       Emitted as the first SSE event before any AI chunks.
+ *                       Tells the frontend what to expect (hasModel, intent) so the
+ *                       skeleton can be shown or suppressed immediately.
  */
 export async function runAnalysisStreaming(
   env: Env,
@@ -225,6 +228,7 @@ export async function runAnalysisStreaming(
   userMessage: string,
   extraDoneData: Record<string, unknown>,
   onComplete: (response: string, prediction: PredictionData | null, typedPrediction: TypedPredictionPayload | null) => Promise<void>,
+  metaData?: { hasModel: boolean; intent: string },
 ): Promise<ReadableStream<Uint8Array>> {
   // Workers AI with stream:true returns ReadableStream<Uint8Array>
   const aiStream = await env.AI.run(
@@ -252,6 +256,12 @@ export async function runAnalysisStreaming(
 
       const emit = (data: Record<string, unknown>) =>
         controller.enqueue(encoder.encode(`data: ${JSON.stringify(data)}\n\n`));
+
+      // Emit meta event first — frontend uses this to show/suppress skeleton
+      // before any AI content arrives.
+      if (metaData) {
+        emit({ type: 'meta', ...metaData });
+      }
 
       try {
         while (true) {

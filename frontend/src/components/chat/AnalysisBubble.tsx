@@ -70,9 +70,9 @@ export default function AnalysisBubble({ message, showModelBlock = true }: Analy
       )}
 
       {/* ── Model output block: only on first occurrence ── */}
-      {showModelBlock && isStreaming && !simResult ? (
+      {showModelBlock && isStreaming && !simResult && message.hasModel !== false ? (
         <div className="ab-model-block">
-          <span className="ab-block-label">Dixon-Coles · Monte Carlo · 15,000 simulations</span>
+          {/* Label intentionally absent from skeleton — avoids false promise for non-result queries */}
           <div className="ab-skel ab-skel--bar" />
           <div className="ab-two-col">
             <div className="ab-skel ab-skel--box" />

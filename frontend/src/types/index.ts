@@ -73,6 +73,10 @@ export interface ChatMessage {
   simResult?: SimResult;
   adjustmentNotes?: string[];
   typedPrediction?: TypedPrediction;
+  /** Set by SSE meta event before streaming begins. false = skip model block skeleton. */
+  hasModel?: boolean;
+  /** Intent classified server-side before LLM call. */
+  intent?: string;
   metadata?: {
     fixtureId?: number;
     predictionId?: string;

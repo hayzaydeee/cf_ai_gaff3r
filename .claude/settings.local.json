@@ -12,7 +12,8 @@
       "mcp__plugin_context-mode_context-mode__ctx_execute",
       "Bash(npx vitest:*)",
       "mcp__plugin_context-mode_context-mode__ctx_batch_execute",
-      "mcp__plugin_context-mode_context-mode__ctx_search"
+      "mcp__plugin_context-mode_context-mode__ctx_search",
+      "Bash(npm test:*)"
     ]
   }
 }

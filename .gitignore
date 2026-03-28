@@ -11,6 +11,8 @@ dist/
 .dev.vars
 .dev.vars.example
 
+/docs
+
 # IDE
 .vscode/
 .idea/
