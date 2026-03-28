@@ -122,18 +122,6 @@ function MockAssistantBubble({ children }: { children: React.ReactNode }) {
   );
 }
 
-// ── Logo ───────────────────────────────────────────────────────────────────
-
-function GaffLogo({ size = 20 }: { size?: number }) {
-  return (
-    <svg width={size} height={size} viewBox="0 0 32 32" aria-hidden="true" style={{ flexShrink: 0 }}>
-      <circle cx="16" cy="16" r="15" fill="none" stroke="var(--color-orange)" strokeWidth="1.5" />
-      <circle cx="16" cy="16" r="6" fill="none" stroke="var(--color-orange)" strokeWidth="1" />
-      <line x1="16" y1="1" x2="16" y2="31" stroke="var(--color-orange)" strokeWidth="0.75" opacity="0.5" />
-      <circle cx="16" cy="16" r="1.5" fill="var(--color-orange)" />
-    </svg>
-  );
-}
 
 // ── Main component ─────────────────────────────────────────────────────────
 
@@ -154,9 +142,8 @@ export default function Landing() {
       {/* ── Nav ── */}
       <header className="ld-nav">
         <div className="ld-nav-inner">
-          <a href="/" className="ld-brand" aria-label="gaff3r home">
-            <GaffLogo size={20} />
-            <span className="ld-brand-text">gaff<span className="ld-o">3</span>r</span>
+          <a href="/" className="ld-brand-text" aria-label="gaff3r home">
+            gaff<span className="ld-o">3</span>r
           </a>
           <button className="ld-nav-btn" onClick={openAuth}>Sign in</button>
         </div>
@@ -495,7 +482,7 @@ export default function Landing() {
           text-decoration: none;
         }
         .ld-brand-text {
-          font-family: var(--font-mono);
+          font-family: var(--font-display);
           font-size: 16px;
           font-weight: 500;
           color: var(--color-char);

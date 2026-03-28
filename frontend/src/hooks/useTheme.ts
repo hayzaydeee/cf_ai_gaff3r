@@ -16,7 +16,7 @@ export function useTheme() {
         return 'dark';
       }
     }
-    return 'light';
+    return 'dark';
   });
 
   useEffect(() => {
