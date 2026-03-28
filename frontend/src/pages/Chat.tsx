@@ -158,15 +158,6 @@ export default function Chat() {
             <MessageBubble key={msg.id} message={msg} />
           ))}
 
-          {loading && (
-            <div className="chat-typing">
-              <div className="msg-avatar">⚽</div>
-              <div className="typing-indicator">
-                <span /><span /><span />
-              </div>
-            </div>
-          )}
-
           {error && (
             <div className="chat-error">⚠️ {error}</div>
           )}

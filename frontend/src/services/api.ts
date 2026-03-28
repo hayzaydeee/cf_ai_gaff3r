@@ -235,7 +235,9 @@ export async function* sendChatStream(
         if (!trimmed.startsWith('data:')) continue;
         const raw = trimmed.slice(5).trim();
         try {
-          yield JSON.parse(raw) as ChatStreamChunk;
+          const parsed = JSON.parse(raw) as ChatStreamChunk;
+          yield parsed;
+          if (parsed.type === 'done' || parsed.type === 'error') return;
         } catch {
           // malformed SSE line, skip
         }

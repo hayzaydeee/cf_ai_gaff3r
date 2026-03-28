@@ -85,6 +85,7 @@ export function useChat(gameweek: number | null, fixtureId?: number) {
               : m
           ));
           setLastAccuracy(chunk.accuracy);
+          break;
         } else if (chunk.type === 'error') {
           throw new Error(chunk.error);
         }
