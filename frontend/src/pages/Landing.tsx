@@ -1,17 +1,21 @@
 // Landing page — public marketing page at /
 // Authenticated users are redirected to /hub
 
-import { useState, useEffect, useRef } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { motion } from 'framer-motion';
-import { useAuth } from '../context/AuthContext';
-import AuthModal from '../components/auth/AuthModal';
+import { useState, useEffect, useRef } from "react";
+import { useNavigate } from "react-router-dom";
+import { motion } from "framer-motion";
+import { useAuth } from "../context/AuthContext";
+import AuthModal from "../components/auth/AuthModal";
 
 // ── Animation variants ─────────────────────────────────────────────────────
 
 const fadeUp = {
   hidden: { opacity: 0, y: 28 },
-  visible: { opacity: 1, y: 0, transition: { duration: 0.55, ease: 'easeOut' as const } },
+  visible: {
+    opacity: 1,
+    y: 0,
+    transition: { duration: 0.55, ease: "easeOut" as const },
+  },
 };
 
 const stagger = {
@@ -26,7 +30,13 @@ const chatStagger = {
 
 // ── Count-up stat ──────────────────────────────────────────────────────────
 
-function StatCounter({ target, duration = 1400 }: { target: number; duration?: number }) {
+function StatCounter({
+  target,
+  duration = 1400,
+}: {
+  target: number;
+  duration?: number;
+}) {
   const ref = useRef<HTMLSpanElement>(null);
   const [value, setValue] = useState(0);
 
@@ -46,7 +56,7 @@ function StatCounter({ target, duration = 1400 }: { target: number; duration?: n
         }
         requestAnimationFrame(step);
       },
-      { threshold: 0.5 }
+      { threshold: 0.5 },
     );
     obs.observe(el);
     return () => obs.disconnect();
@@ -57,13 +67,27 @@ function StatCounter({ target, duration = 1400 }: { target: number; duration?: n
 
 // ── Snapshot components ────────────────────────────────────────────────────
 
-function MockOutcomeBar({ home, draw, away }: { home: number; draw: number; away: number }) {
+function MockOutcomeBar({
+  home,
+  draw,
+  away,
+}: {
+  home: number;
+  draw: number;
+  away: number;
+}) {
   return (
     <div className="mob-root">
       <div className="mob-labels">
-        <span className="mob-label">Home <strong>{home}%</strong></span>
-        <span className="mob-label mob-center">Draw <strong>{draw}%</strong></span>
-        <span className="mob-label mob-right">Away <strong>{away}%</strong></span>
+        <span className="mob-label">
+          Home <strong>{home}%</strong>
+        </span>
+        <span className="mob-label mob-center">
+          Draw <strong>{draw}%</strong>
+        </span>
+        <span className="mob-label mob-right">
+          Away <strong>{away}%</strong>
+        </span>
       </div>
       <div className="mob-bar">
         <div className="mob-seg mob-home" style={{ width: `${home}%` }} />
@@ -75,10 +99,19 @@ function MockOutcomeBar({ home, draw, away }: { home: number; draw: number; away
 }
 
 function MockPredictionCard({
-  home, away, homeScore, awayScore, confidence, reasoning,
+  home,
+  away,
+  homeScore,
+  awayScore,
+  confidence,
+  reasoning,
 }: {
-  home: string; away: string; homeScore: number; awayScore: number;
-  confidence: 'low' | 'medium' | 'high'; reasoning: string;
+  home: string;
+  away: string;
+  homeScore: number;
+  awayScore: number;
+  confidence: "low" | "medium" | "high";
+  reasoning: string;
 }) {
   return (
     <div className="mpc-root">
@@ -88,7 +121,9 @@ function MockPredictionCard({
       </div>
       <div className="mpc-score">
         <span className="mpc-team">{home}</span>
-        <span className="mpc-line">{homeScore} – {awayScore}</span>
+        <span className="mpc-line">
+          {homeScore} – {awayScore}
+        </span>
         <span className="mpc-team">{away}</span>
       </div>
       <p className="mpc-reasoning">{reasoning}</p>
@@ -96,7 +131,13 @@ function MockPredictionCard({
   );
 }
 
-function MockSectionCard({ label, children }: { label: string; children: React.ReactNode }) {
+function MockSectionCard({
+  label,
+  children,
+}: {
+  label: string;
+  children: React.ReactNode;
+}) {
   return (
     <div className="msc-root">
       <div className="msc-label">{label}</div>
@@ -131,26 +172,26 @@ export default function Landing() {
   const [authOpen, setAuthOpen] = useState(false);
 
   useEffect(() => {
-    if (!isLoading && isAuthenticated) navigate('/hub', { replace: true });
+    if (!isLoading && isAuthenticated) navigate("/hub", { replace: true });
   }, [isAuthenticated, isLoading, navigate]);
 
   const openAuth = () => setAuthOpen(true);
 
   return (
     <div className="ld-root">
-
       {/* ── Nav ── */}
       <header className="ld-nav">
         <div className="ld-nav-inner">
           <a href="/" className="ld-brand-text" aria-label="gaff3r home">
             gaff<span className="ld-o">3</span>r
           </a>
-          <button className="ld-nav-btn" onClick={openAuth}>Sign in</button>
+          <button className="ld-nav-btn" onClick={openAuth}>
+            Sign in
+          </button>
         </div>
       </header>
 
       <main>
-
         {/* ── Hero ── */}
         <section className="ld-hero-section">
           <div className="ld-hero-inner">
@@ -161,15 +202,20 @@ export default function Landing() {
               animate="visible"
             >
               <motion.h1 className="ld-hero-title" variants={fadeUp}>
-                Football predictions,<br />backed by real maths.
+                Football predictions,
+                <br />
+                backed by real maths.
               </motion.h1>
               <motion.p className="ld-hero-sub" variants={fadeUp}>
-                Ask the gaffer about any Premier League fixture. Get win probabilities,
-                predicted scorelines, and tactical breakdowns — powered by Dixon-Coles
-                and 15,000 Monte Carlo simulations per match.
+                Ask the gaffer about any Premier League fixture. Get win
+                probabilities, predicted scorelines, and tactical breakdowns —
+                powered by Dixon-Coles and 15,000 Monte Carlo simulations per
+                match.
               </motion.p>
               <motion.div className="ld-hero-ctas" variants={fadeUp}>
-                <button className="ld-btn-primary" onClick={openAuth}>Ask the gaffer →</button>
+                <button className="ld-btn-primary" onClick={openAuth}>
+                  Ask the gaffer →
+                </button>
                 <a
                   href="https://github.com/adamb/cf_ai_gaff3r"
                   target="_blank"
@@ -185,33 +231,45 @@ export default function Landing() {
               <motion.div
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.7, delay: 0.35, ease: 'easeOut' }}
+                transition={{ duration: 0.7, delay: 0.35, ease: "easeOut" }}
               >
                 <motion.div
                   className="ld-hero-mock"
                   animate={{ y: [0, -8, 0] }}
-                  transition={{ repeat: Infinity, duration: 5, ease: 'easeInOut' }}
+                  transition={{
+                    repeat: Infinity,
+                    duration: 5,
+                    ease: "easeInOut",
+                  }}
                 >
                   <div className="ld-mock-chrome">
                     <span className="ld-chrome-dot" />
                     <span className="ld-chrome-dot" />
                     <span className="ld-chrome-dot" />
-                    <span className="ld-chrome-title">gaff<span className="ld-o">3</span>r</span>
+                    <span className="ld-chrome-title">
+                      gaff<span className="ld-o">3</span>r
+                    </span>
                   </div>
                   <div className="ld-mock-body">
                     <div className="mub-root">
-                      <div className="mub-bubble">Who do you fancy for Arsenal vs Chelsea?</div>
+                      <div className="mub-bubble">
+                        Who do you fancy for Arsenal vs Chelsea?
+                      </div>
                     </div>
                     <div className="ld-mock-ai-row">
                       <div className="ld-mock-sigil">⚽</div>
                       <div className="ld-mock-ai-content">
                         <MockSectionCard label="The Model's View">
-                          Dixon-Coles gives Arsenal the edge — <strong>42% home / 28% draw / 30% away</strong> across 15,000 simulations.
+                          Dixon-Coles gives Arsenal the edge —{" "}
+                          <strong>42% home / 28% draw / 30% away</strong> across
+                          15,000 simulations.
                         </MockSectionCard>
                         <MockOutcomeBar home={42} draw={28} away={30} />
                         <MockPredictionCard
-                          home="Arsenal" away="Chelsea"
-                          homeScore={2} awayScore={1}
+                          home="Arsenal"
+                          away="Chelsea"
+                          homeScore={2}
+                          awayScore={1}
                           confidence="medium"
                           reasoning="Arsenal's press should create enough second-ball situations to pull clear."
                         />
@@ -234,12 +292,16 @@ export default function Landing() {
         >
           <div className="ld-stats-inner">
             <div className="ld-stat">
-              <span className="ld-stat-val"><StatCounter target={15000} /></span>
+              <span className="ld-stat-val">
+                <StatCounter target={15000} />
+              </span>
               <span className="ld-stat-label">simulations per fixture</span>
             </div>
             <div className="ld-stat-divider" />
             <div className="ld-stat">
-              <span className="ld-stat-val"><StatCounter target={38} duration={900} /></span>
+              <span className="ld-stat-val">
+                <StatCounter target={38} duration={900} />
+              </span>
               <span className="ld-stat-label">gameweeks tracked</span>
             </div>
             <div className="ld-stat-divider" />
@@ -260,7 +322,9 @@ export default function Landing() {
             viewport={{ once: true }}
           >
             <h2 className="ld-section-h2">See it in action</h2>
-            <p className="ld-section-sub">A real conversation with the gaffer</p>
+            <p className="ld-section-sub">
+              A real conversation with the gaffer
+            </p>
           </motion.div>
 
           <motion.div
@@ -268,7 +332,7 @@ export default function Landing() {
             variants={chatStagger}
             initial="hidden"
             whileInView="visible"
-            viewport={{ once: true, margin: '-60px' }}
+            viewport={{ once: true, margin: "-60px" }}
           >
             <MockUserBubble>
               Who do you fancy for Arsenal vs Chelsea this weekend?
@@ -276,17 +340,22 @@ export default function Landing() {
 
             <MockAssistantBubble>
               <MockSectionCard label="The Model's View">
-                Dixon-Coles gives Arsenal a narrow edge — <strong>42% home / 28% draw / 30% away</strong> across
-                15,000 simulations. Their attack rating is the joint-highest in the division this season.
+                Dixon-Coles gives Arsenal a narrow edge —{" "}
+                <strong>42% home / 28% draw / 30% away</strong> across 15,000
+                simulations. Their attack rating is the joint-highest in the
+                division this season.
               </MockSectionCard>
               <MockOutcomeBar home={42} draw={28} away={30} />
               <MockSectionCard label="Key Factors">
-                Arsenal's xG over the last 6 GWs: <strong>2.1</strong>. Chelsea have conceded in 9 of
-                their last 11 away fixtures, and their defensive line sits unusually high — exploitable on the counter.
+                Arsenal's xG over the last 6 GWs: <strong>2.1</strong>. Chelsea
+                have conceded in 9 of their last 11 away fixtures, and their
+                defensive line sits unusually high — exploitable on the counter.
               </MockSectionCard>
               <MockPredictionCard
-                home="Arsenal" away="Chelsea"
-                homeScore={2} awayScore={1}
+                home="Arsenal"
+                away="Chelsea"
+                homeScore={2}
+                awayScore={1}
                 confidence="medium"
                 reasoning="Arsenal's press will create enough second-ball situations to pull away after half-time."
               />
@@ -298,8 +367,9 @@ export default function Landing() {
 
             <MockAssistantBubble>
               <MockSectionCard label="Team News">
-                FPL ownership and last-GW selection data point to Martinelli in the XI.
-                Havertz is likely rotated — cup fixture midweek means Arteta will manage minutes carefully.
+                FPL ownership and last-GW selection data point to Martinelli in
+                the XI. Havertz is likely rotated — cup fixture midweek means
+                Arteta will manage minutes carefully.
               </MockSectionCard>
             </MockAssistantBubble>
           </motion.div>
@@ -315,7 +385,9 @@ export default function Landing() {
             className="ld-pipeline-header"
           >
             <h2 className="ld-section-h2">How predictions are made</h2>
-            <p className="ld-section-sub">Statistical rigour, not LLM guesswork</p>
+            <p className="ld-section-sub">
+              Statistical rigour, not LLM guesswork
+            </p>
           </motion.div>
 
           <motion.div
@@ -327,24 +399,24 @@ export default function Landing() {
           >
             {[
               {
-                n: '1',
-                title: 'Dixon-Coles MLE',
-                body: 'Attack and defence strengths fitted to the full season using maximum-likelihood estimation. Includes the Dixon-Coles low-scoring correction for 0–0 and 1–0 results.',
+                n: "1",
+                title: "Dixon-Coles MLE",
+                body: "Attack and defence strengths fitted to the full season using maximum-likelihood estimation. Includes the Dixon-Coles low-scoring correction for 0–0 and 1–0 results.",
               },
               {
-                n: '2',
-                title: 'xG adjustment',
-                body: 'Recent expected-goals data overlaid as a Bayesian prior, weighted toward the last 6 matches to capture current form without overreacting to noise.',
+                n: "2",
+                title: "xG adjustment",
+                body: "Recent expected-goals data overlaid as a Bayesian prior, weighted toward the last 6 matches to capture current form without overreacting to noise.",
               },
               {
-                n: '3',
-                title: 'Monte Carlo simulation',
-                body: '15,000 match outcomes drawn from the fitted Poisson model. Produces a full scoreline probability grid and outcome percentages — not a single point estimate.',
+                n: "3",
+                title: "Monte Carlo simulation",
+                body: "15,000 match outcomes drawn from the fitted Poisson model. Produces a full scoreline probability grid and outcome percentages — not a single point estimate.",
               },
               {
-                n: '4',
-                title: 'Claude AI interpretation',
-                body: 'Simulation output, FPL squad data, and fixture context passed to Claude. You get a readable, tactically-aware breakdown — not just numbers on a screen.',
+                n: "4",
+                title: "Claude AI interpretation",
+                body: "Simulation output, FPL squad data, and fixture context passed to Claude. You get a readable, tactically-aware breakdown — not just numbers on a screen.",
               },
             ].map((step) => (
               <motion.div key={step.n} className="ld-step" variants={fadeUp}>
@@ -370,7 +442,9 @@ export default function Landing() {
             viewport={{ once: true }}
           >
             <h2 className="ld-section-h2">Built for the long game</h2>
-            <p className="ld-section-sub">Everything you need to follow a season properly</p>
+            <p className="ld-section-sub">
+              Everything you need to follow a season properly
+            </p>
           </motion.div>
 
           <motion.div
@@ -382,19 +456,23 @@ export default function Landing() {
           >
             {[
               {
-                title: 'Prediction tracking',
-                body: 'Every prediction stored and resolved automatically after the match. See your outcome accuracy, exact score rate, streaks, and calibration across the season.',
+                title: "Prediction tracking",
+                body: "Every prediction stored and resolved automatically after the match. See your outcome accuracy, exact score rate, streaks, and calibration across the season.",
               },
               {
-                title: 'FPL context built in',
-                body: 'Squad selections, captain choices, and ownership data from the FPL API inform every answer. Team news and rotation risk are always current.',
+                title: "FPL context built in",
+                body: "Squad selections, captain choices, and ownership data from the FPL API inform every answer. Team news and rotation risk are always current.",
               },
               {
-                title: 'Per-fixture conversations',
-                body: 'Each match gets its own chat thread. Come back mid-week for injury updates, or review what the gaffer said before kick-off.',
+                title: "Per-fixture conversations",
+                body: "Each match gets its own chat thread. Come back mid-week for injury updates, or review what the gaffer said before kick-off.",
               },
             ].map((f) => (
-              <motion.div key={f.title} className="ld-feat-card" variants={fadeUp}>
+              <motion.div
+                key={f.title}
+                className="ld-feat-card"
+                variants={fadeUp}
+              >
                 <p className="ld-feat-title">{f.title}</p>
                 <p className="ld-feat-body">{f.body}</p>
               </motion.div>
@@ -410,14 +488,65 @@ export default function Landing() {
           whileInView="visible"
           viewport={{ once: true }}
         >
-          <span className="ld-studio-badge">coming soon</span>
-          <h2 className="ld-studio-title">gaff<span className="ld-o">3</span>r studio</h2>
-          <p className="ld-studio-sub">
-            Text-to-SQL queries over your entire prediction history.
-          </p>
-          <div className="ld-studio-queries">
-            <p className="ld-studio-query">"Which teams have I over-predicted at home this season?"</p>
-            <p className="ld-studio-query">"Show my accuracy in matches where the home xG exceeded 2.5."</p>
+          <div className="ld-studio-inner">
+            <div className="ld-studio-copy">
+              <span className="ld-studio-badge">coming soon</span>
+              <h2 className="ld-studio-title">
+                gaff<span className="ld-o">3</span>r studio
+              </h2>
+              <p className="ld-studio-sub">
+                A research assistant for football content creators. Ask any
+                analytical question — get real computed data back, not LLM
+                guesswork.
+              </p>
+              <p className="ld-studio-detail">
+                Every football video, thread, or post follows the same pattern:
+                define a time window, compute the metrics, find the standout
+                numbers, build a narrative. Studio eliminates the 3–5 hours of
+                manual research that currently precede that work — replacing
+                five open browser tabs with one conversational interface.
+              </p>
+              <div className="ld-studio-caps">
+                {(
+                  [
+                    {
+                      label: "Text-to-SQL",
+                      desc: "Natural language queries against the full football database",
+                    },
+                    {
+                      label: "Time windows",
+                      desc: "Computed metrics across any gameweek range, not just this season",
+                    },
+                    {
+                      label: "Comparison engine",
+                      desc: "Side-by-side analysis across teams, managers, players, or eras",
+                    },
+                    {
+                      label: "Content output",
+                      desc: "Talking points, script sections, exportable data cards",
+                    },
+                  ] as const
+                ).map((c) => (
+                  <div key={c.label} className="ld-studio-cap">
+                    <span className="ld-studio-cap-label">{c.label}</span>
+                    <span className="ld-studio-cap-desc">{c.desc}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+            <div className="ld-studio-queries-col">
+              <p className="ld-studio-queries-label">Example queries</p>
+              {[
+                '"Which team has the best away xG since Christmas?"',
+                '"How did Arsenal\'s press metrics change after the back-three switch in GW12?"',
+                '"Top 5 players by goal contributions per 90 in the last 6 gameweeks."',
+                '"Compare Slot and Klopp\'s Liverpool — same period, different era."',
+              ].map((q) => (
+                <p key={q} className="ld-studio-query">
+                  {q}
+                </p>
+              ))}
+            </div>
           </div>
         </motion.section>
 
@@ -430,23 +559,56 @@ export default function Landing() {
           viewport={{ once: true }}
         >
           <h2 className="ld-cta-title">Ready to ask the gaffer?</h2>
-          <p className="ld-cta-sub">Free to use. Sign in to save predictions and track your accuracy.</p>
-          <button className="ld-btn-primary" onClick={openAuth}>Ask the gaffer →</button>
+          <p className="ld-cta-sub">
+            Free to use. Sign in to save predictions and track your accuracy.
+          </p>
+          <button className="ld-btn-primary" onClick={openAuth}>
+            Ask the gaffer →
+          </button>
         </motion.section>
 
         {/* ── Footer ── */}
         <footer className="ld-footer">
-          <span className="ld-footer-brand">gaff<span className="ld-o">3</span>r</span>
-          <span className="ld-footer-sep">·</span>
-          <span className="ld-footer-sub">Built on Cloudflare's edge</span>
+          <div className="ld-footer-inner">
+            <div className="ld-footer-top">
+              <a href="/" className="ld-brand-text" aria-label="gaff3r home">
+                gaff<span className="ld-o">3</span>r
+              </a>
+              <nav className="ld-footer-links" aria-label="Footer links">
+                <a href="mailto:hayzayd33@gmail.com" className="ld-footer-link">
+                  Contact
+                </a>
+                <a
+                  href="https://hayzaydee.me"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="ld-footer-link"
+                >
+                  Portfolio
+                </a>
+                <a
+                  href="https://github.com/hayzaydeee/cf_ai_gaff3r"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="ld-footer-link"
+                >
+                  GitHub
+                </a>
+              </nav>
+            </div>
+            <div className="ld-footer-bottom">
+              <span>
+                © {new Date().getFullYear()} hayzaydee
+              </span>
+            </div>
+          </div>
         </footer>
-
       </main>
 
       <AuthModal
         isOpen={authOpen}
         onClose={() => setAuthOpen(false)}
-        onSuccess={() => navigate('/hub')}
+        onSuccess={() => navigate("/hub")}
       />
 
       <style>{`
@@ -895,10 +1057,15 @@ export default function Landing() {
 
         /* ── Studio teaser ── */
         .ld-studio-section {
-          max-width: 760px;
+          max-width: 1080px;
           margin: 0 auto;
           padding: 80px 32px;
-          text-align: center;
+        }
+        .ld-studio-inner {
+          display: grid;
+          grid-template-columns: 1fr 1fr;
+          gap: 56px;
+          align-items: start;
         }
         .ld-studio-badge {
           display: inline-block;
@@ -916,24 +1083,59 @@ export default function Landing() {
         }
         .ld-studio-title {
           font-family: var(--font-display);
-          font-size: clamp(20px, 3vw, 28px);
+          font-size: clamp(22px, 3vw, 30px);
           font-weight: 700;
-          margin: 0 0 10px;
+          margin: 0 0 12px;
           color: var(--color-char);
           letter-spacing: -0.3px;
         }
         .ld-studio-sub {
           font-family: var(--font-body);
-          font-size: 15px;
-          color: var(--color-char-muted);
-          margin: 0 0 24px;
+          font-size: 16px;
+          color: var(--color-char);
+          margin: 0 0 14px;
+          line-height: 1.65;
         }
-        .ld-studio-queries {
+        .ld-studio-detail {
+          font-family: var(--font-body);
+          font-size: 14px;
+          color: var(--color-char-muted);
+          margin: 0 0 28px;
+          line-height: 1.7;
+        }
+        .ld-studio-caps {
           display: flex;
           flex-direction: column;
-          gap: 8px;
-          max-width: 520px;
-          margin: 0 auto;
+          gap: 12px;
+        }
+        .ld-studio-cap {
+          display: flex;
+          flex-direction: column;
+          gap: 2px;
+          padding-left: 12px;
+          border-left: 2px solid var(--color-orange);
+        }
+        .ld-studio-cap-label {
+          font-family: var(--font-display);
+          font-size: 13px;
+          font-weight: 600;
+          color: var(--color-char);
+        }
+        .ld-studio-cap-desc {
+          font-family: var(--font-body);
+          font-size: 13px;
+          color: var(--color-char-muted);
+          line-height: 1.5;
+        }
+        .ld-studio-queries-col { display: flex; flex-direction: column; gap: 8px; }
+        .ld-studio-queries-label {
+          font-family: var(--font-display);
+          font-size: 10px;
+          font-weight: 700;
+          text-transform: uppercase;
+          letter-spacing: 0.09em;
+          color: var(--color-char-muted);
+          margin: 0 0 4px;
         }
         .ld-studio-query {
           font-family: var(--font-mono);
@@ -945,8 +1147,7 @@ export default function Landing() {
           background: var(--color-beige);
           border: 1px solid var(--color-border);
           border-radius: var(--radius-md);
-          text-align: left;
-          line-height: 1.5;
+          line-height: 1.55;
         }
 
         /* ── Bottom CTA ── */
@@ -973,23 +1174,50 @@ export default function Landing() {
 
         /* ── Footer ── */
         .ld-footer {
+          border-top: 1px solid var(--color-border);
+          padding: 32px 32px 28px;
+        }
+        .ld-footer-inner {
+          max-width: 1080px;
+          margin: 0 auto;
+        }
+        .ld-footer-top {
           display: flex;
           align-items: center;
-          justify-content: center;
-          gap: 10px;
-          padding: 24px 32px;
-          border-top: 1px solid var(--color-border);
+          justify-content: space-between;
+          margin-bottom: 20px;
         }
         .ld-footer-brand {
+          display: flex;
+          align-items: center;
+          gap: 7px;
+          text-decoration: none;
           font-family: var(--font-mono);
+          font-size: 14px;
+          font-weight: 500;
+          color: var(--color-char-muted);
+          transition: color 0.15s;
+        }
+        .ld-footer-brand:hover { color: var(--color-char); }
+        .ld-footer-links { display: flex; align-items: center; gap: 24px; }
+        .ld-footer-link {
+          font-family: var(--font-display);
           font-size: 13px;
           color: var(--color-char-muted);
+          text-decoration: none;
+          transition: color 0.15s;
         }
-        .ld-footer-sep { color: var(--color-border); }
-        .ld-footer-sub { font-size: 12px; color: var(--color-char-muted); }
+        .ld-footer-link:hover { color: var(--color-char); }
+        .ld-footer-bottom {
+          font-family: var(--font-display);
+          font-size: 12px;
+          color: var(--color-char-muted);
+          opacity: 0.65;
+        }
 
         /* ── Responsive ── */
         @media (max-width: 860px) {
+          .ld-studio-inner { grid-template-columns: 1fr; gap: 36px; }
           .ld-hero-inner { grid-template-columns: 1fr; }
           .ld-hero-mock-wrap { display: none; }
           .ld-hero-section { padding: 52px 24px 40px; }
@@ -1006,6 +1234,9 @@ export default function Landing() {
           .ld-pipeline-section { padding-left: 20px; padding-right: 20px; }
           .ld-stats-section { padding-left: 20px; padding-right: 20px; }
           .ld-demo-panel { padding: 18px; }
+          .ld-footer { padding: 24px 20px; }
+          .ld-footer-top { flex-direction: column; align-items: flex-start; gap: 16px; }
+          .ld-footer-links { gap: 16px; }
         }
       `}</style>
     </div>
