@@ -3,7 +3,7 @@
 
 import { useState, useCallback, useEffect } from 'react';
 import type { ChatMessage } from '../types';
-import { sendChat, getChatHistory, type ChatResponseData } from '../services/api';
+import { sendChatStream, getChatHistory, type ChatResponseData } from '../services/api';
 
 export function filterMessagesForFixture(messages: ChatMessage[], fixtureId?: number): ChatMessage[] {
   if (!fixtureId) return messages;
@@ -48,36 +48,50 @@ export function useChat(gameweek: number | null, fixtureId?: number) {
     if (!gameweek || !message.trim()) return;
 
     const activeFixtureId = sendFixtureId ?? fixtureId;
+    const trimmed = message.trim();
 
-    // Optimistically add user message
+    // Optimistically add user message + empty streaming placeholder
     const userMsg: ChatMessage = {
       id: `local_${Date.now()}`,
       role: 'user',
-      content: message.trim(),
+      content: trimmed,
       timestamp: new Date().toISOString(),
       metadata: activeFixtureId ? { fixtureId: activeFixtureId } : undefined,
     };
-    setAllMessages(prev => [...prev, userMsg]);
+    const streamId = `stream_${Date.now()}`;
+    const streamMsg: ChatMessage = {
+      id: streamId,
+      role: 'assistant',
+      content: '',
+      timestamp: new Date().toISOString(),
+      streaming: true,
+      metadata: activeFixtureId ? { fixtureId: activeFixtureId } : undefined,
+    };
+
+    setAllMessages(prev => [...prev, userMsg, streamMsg]);
     setLoading(true);
     setError(null);
 
     try {
-      const data = await sendChat(message.trim(), gameweek, activeFixtureId);
-
-      const assistantMsg: ChatMessage = {
-        id: `local_${Date.now()}_resp`,
-        role: 'assistant',
-        content: data.response,
-        timestamp: new Date().toISOString(),
-        metadata: activeFixtureId ? { fixtureId: activeFixtureId } : undefined,
-        prediction: data.prediction,
-      };
-      setAllMessages(prev => [...prev, assistantMsg]);
-      setLastAccuracy(data.accuracy);
+      for await (const chunk of sendChatStream(trimmed, gameweek, activeFixtureId)) {
+        if (chunk.type === 'chunk') {
+          setAllMessages(prev => prev.map(m =>
+            m.id === streamId ? { ...m, content: m.content + chunk.text } : m
+          ));
+        } else if (chunk.type === 'done') {
+          setAllMessages(prev => prev.map(m =>
+            m.id === streamId
+              ? { ...m, content: chunk.response, streaming: false, prediction: chunk.prediction }
+              : m
+          ));
+          setLastAccuracy(chunk.accuracy);
+        } else if (chunk.type === 'error') {
+          throw new Error(chunk.error);
+        }
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to get response');
-      // Remove the optimistic message on error
-      setAllMessages(prev => prev.filter(m => m.id !== userMsg.id));
+      setAllMessages(prev => prev.filter(m => m.id !== userMsg.id && m.id !== streamId));
     } finally {
       setLoading(false);
     }

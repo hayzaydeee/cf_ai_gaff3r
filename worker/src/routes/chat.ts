@@ -13,7 +13,7 @@ import type { Env } from '../types/env';
 import type { ChatRequest, ChatResponse, FixtureItem } from '../types/api';
 import type { ChatMessage, Prediction, AccuracyStats, Outcome } from '../types/app';
 import { fetchMatchContext } from '../services/match-context';
-import { runAnalysis } from '../services/ai';
+import { runAnalysis, runAnalysisStreaming } from '../services/ai';
 import { SYSTEM_PROMPT, buildPLUserMessage, buildStandardUserMessage } from '../prompts/gaffer';
 import { fetchFixtures, fetchBootstrap } from '../services/fpl';
 import { fetchUpcomingMatches } from '../services/football-data';
@@ -33,7 +33,7 @@ export async function handleChat(
   ctx?: ExecutionContext,
 ): Promise<Response> {
   const body = await request.json() as ChatRequest;
-  const { message, gameweek, fixtureId: providedFixtureId } = body;
+  const { message, gameweek, fixtureId: providedFixtureId, stream: wantsStream } = body;
 
   if (!message || !gameweek) {
     return errorResponse('Missing message or gameweek', 400);
@@ -143,7 +143,94 @@ export async function handleChat(
     }
   }
 
-  // Step 7: Call Workers AI
+  // Shared post-processing: stores messages + prediction after AI response
+  const runPostProcessing = async (
+    cleanResponse: string,
+    prediction: import('../services/ai').PredictionData | null,
+  ) => {
+    const userMsg: ChatMessage = {
+      id: `msg_${crypto.randomUUID().slice(0, 8)}`,
+      role: 'user',
+      content: message,
+      timestamp: new Date().toISOString(),
+      metadata: resolvedFixtureId ? { fixtureId: resolvedFixtureId } : undefined,
+    };
+    const predictionId = prediction ? `pred_${crypto.randomUUID().slice(0, 8)}` : undefined;
+    const assistantMsg: ChatMessage = {
+      id: `msg_${crypto.randomUUID().slice(0, 8)}`,
+      role: 'assistant',
+      content: cleanResponse,
+      timestamp: new Date().toISOString(),
+      metadata: (resolvedFixtureId || predictionId) ? { fixtureId: resolvedFixtureId, predictionId } : undefined,
+    };
+    await doStub.fetch(new Request(`http://do/chat/${gameweek}`, { method: 'POST', body: JSON.stringify(userMsg) }));
+    await doStub.fetch(new Request(`http://do/chat/${gameweek}`, { method: 'POST', body: JSON.stringify(assistantMsg) }));
+
+    if (prediction && matchContext && resolvedFixtureId && fixtureItem) {
+      const predId = predictionId ?? `pred_${crypto.randomUUID().slice(0, 8)}`;
+      const predictedOutcome: Outcome =
+        prediction.homeScore > prediction.awayScore ? 'home' :
+        prediction.awayScore > prediction.homeScore ? 'away' : 'draw';
+      const pred: Prediction = {
+        id: predId, fixtureId: resolvedFixtureId, gameweek, status: 'pending',
+        homeTeam: prediction.homeTeam, awayTeam: prediction.awayTeam,
+        homeTeamId: fixtureItem.homeTeamId, awayTeamId: fixtureItem.awayTeamId,
+        competition: fixtureItem.competition, competitionCode: resolvedCompetitionCode,
+        kickoffTime: fixtureItem.kickoffTime,
+        predictedScore: { home: prediction.homeScore, away: prediction.awayScore },
+        predictedOutcome, confidence: prediction.confidence, reasoning: prediction.reasoning,
+        createdAt: new Date().toISOString(),
+      };
+      await doStub.fetch(new Request('http://do/prediction', { method: 'POST', body: JSON.stringify(pred) }));
+
+      const fixtureTs = fixtureItem.kickoffTime ? Math.floor(new Date(fixtureItem.kickoffTime).getTime() / 1000) : null;
+      const outcomeProbsJson = simResult ? JSON.stringify({ home: simResult.homeWinPct, draw: simResult.drawPct, away: simResult.awayWinPct }) : null;
+      const modelScorelinesJson = simResult ? JSON.stringify(simResult.topScorelinesWithPct.map(s => ({ score: `${s.home}-${s.away}`, pct: +(s.probability * 100).toFixed(1) }))) : null;
+      try {
+        await env.DB.prepare(`
+          INSERT OR IGNORE INTO predictions
+            (id, user_id, anon_user_id, home_team, away_team, fixture_id, competition_code,
+             fixture_date, league, predicted_home, predicted_away,
+             outcome_probs_json, model_scorelines_json, reasoning_summary, confidence, status, created_at)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', unixepoch())
+        `).bind(predId, isAuthenticated ? userId : null, !isAuthenticated ? userId : null,
+          pred.homeTeam, pred.awayTeam, resolvedFixtureId, resolvedCompetitionCode,
+          fixtureTs, fixtureItem.competition, pred.predictedScore.home, pred.predictedScore.away,
+          outcomeProbsJson, modelScorelinesJson, pred.reasoning, pred.confidence).run();
+      } catch (dbErr) {
+        console.warn('D1 prediction insert failed (streaming):', dbErr);
+      }
+
+      if (simResult) {
+        const storeId = `analysis_${crypto.randomUUID().slice(0, 16)}`;
+        void storeAnalysis(env, storeId, cleanResponse, {
+          homeTeam: matchContext.fixture.homeTeam, awayTeam: matchContext.fixture.awayTeam,
+          competition: matchContext.fixture.competition, date: new Date().toISOString(),
+          predictedScore: `${prediction.homeScore}-${prediction.awayScore}`,
+        });
+      }
+    }
+  };
+
+  // Step 7a: Streaming path — return SSE stream, post-processing runs inside it
+  if (wantsStream) {
+    const extraDone = {
+      accuracy: { totalPredictions: accuracy.totalPredictions, outcomeAccuracy: accuracy.outcomeAccuracy, currentStreak: accuracy.currentStreak },
+      fixtureFound: !!matchContext,
+      dataSource: matchContext ? (matchContext.type === 'pl' ? 'fpl' : 'football-data') : null,
+      identifiedFixture: fixtureItem ? { id: fixtureItem.id, homeTeam: fixtureItem.homeTeam, awayTeam: fixtureItem.awayTeam, kickoffTime: fixtureItem.kickoffTime, competition: fixtureItem.competition, competitionCode: resolvedCompetitionCode } : null,
+    };
+    const streamBody = await runAnalysisStreaming(env, SYSTEM_PROMPT, userPrompt, extraDone, runPostProcessing);
+    return new Response(streamBody, {
+      headers: {
+        'Content-Type': 'text/event-stream',
+        'Cache-Control': 'no-cache, no-transform',
+        'X-Accel-Buffering': 'no',
+      },
+    });
+  }
+
+  // Step 7b: Non-streaming path
   const aiResult = await runAnalysis(env, SYSTEM_PROMPT, userPrompt);
 
   // Step 8: Store messages in chat history

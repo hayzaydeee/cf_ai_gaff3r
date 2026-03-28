@@ -5,6 +5,7 @@ export interface ChatRequest {
   gameweek: number;
   fixtureId?: number;
   userId: string;
+  stream?: boolean;
 }
 
 export interface ChatResponse {

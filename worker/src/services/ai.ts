@@ -160,6 +160,102 @@ function extractPredictionFromText(response: string): PredictionData | null {
 }
 
 /**
+ * Stream a Workers AI response, forwarding SSE chunks to the caller.
+ * Accumulates the full text, extracts the prediction, runs onComplete,
+ * then emits a final `done` SSE event.
+ *
+ * @param extraDoneData  Extra fields merged into the `done` event (accuracy, fixtureFound, etc.)
+ * @param onComplete     Called after full text is assembled (store to DO/D1/Vectorize)
+ */
+export async function runAnalysisStreaming(
+  env: Env,
+  systemPrompt: string,
+  userMessage: string,
+  extraDoneData: Record<string, unknown>,
+  onComplete: (response: string, prediction: PredictionData | null) => Promise<void>,
+): Promise<ReadableStream<Uint8Array>> {
+  // Workers AI with stream:true returns ReadableStream<Uint8Array>
+  const aiStream = await env.AI.run(
+    PRIMARY_MODEL as Parameters<typeof env.AI.run>[0],
+    {
+      messages: [
+        { role: 'system', content: systemPrompt },
+        { role: 'user', content: userMessage },
+      ],
+      max_tokens: 1024,
+      temperature: 0.7,
+      stream: true,
+    } as Parameters<typeof env.AI.run>[1],
+    { gateway: { id: GATEWAY_ID } },
+  ) as ReadableStream<Uint8Array>;
+
+  const encoder = new TextEncoder();
+  let accumulated = '';
+
+  return new ReadableStream<Uint8Array>({
+    async start(controller) {
+      const reader = aiStream.getReader();
+      const decoder = new TextDecoder();
+      let sseBuffer = '';
+
+      const emit = (data: Record<string, unknown>) =>
+        controller.enqueue(encoder.encode(`data: ${JSON.stringify(data)}\n\n`));
+
+      try {
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+
+          sseBuffer += decoder.decode(value, { stream: true });
+          const lines = sseBuffer.split('\n');
+          sseBuffer = lines.pop() ?? '';
+
+          for (const line of lines) {
+            const trimmed = line.trim();
+            if (!trimmed.startsWith('data:')) continue;
+            const raw = trimmed.slice(5).trim();
+            if (raw === '[DONE]') continue;
+
+            try {
+              const parsed = JSON.parse(raw);
+              const text: string = parsed.response ?? '';
+              if (text) {
+                accumulated += text;
+                emit({ type: 'chunk', text });
+              }
+            } catch {
+              // malformed SSE chunk — skip
+            }
+          }
+        }
+      } catch (err) {
+        console.error('AI stream read error:', err);
+        emit({ type: 'error', error: 'Stream interrupted' });
+        controller.close();
+        return;
+      } finally {
+        reader.releaseLock();
+      }
+
+      // Full response assembled — extract prediction and clean text
+      const prediction = extractPrediction(accumulated);
+      const cleanResponse = accumulated
+        .replace(/<<<PREDICTION_JSON>>>[\s\S]*?<<<END_PREDICTION_JSON>>>/g, '')
+        .trim();
+
+      try {
+        await onComplete(cleanResponse, prediction);
+      } catch (err) {
+        console.warn('Streaming onComplete failed:', err);
+      }
+
+      emit({ type: 'done', response: cleanResponse, prediction, ...extraDoneData });
+      controller.close();
+    },
+  });
+}
+
+/**
  * Generate a text embedding using the BGE-small model via AI Gateway.
  * Returns a 768-dimension float array, or null on failure.
  */

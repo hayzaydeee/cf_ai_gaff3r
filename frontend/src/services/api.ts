@@ -177,13 +177,73 @@ export function getUpcomingFixtures(): Promise<{ fixtures: FixtureData[] }> {
 }
 
 /**
- * POST /api/chat
+ * POST /api/chat (non-streaming, kept for fallback/testing)
  */
 export function sendChat(message: string, gameweek: number, fixtureId?: number): Promise<ChatResponseData> {
   return fetchAPI<ChatResponseData>('/api/chat', {
     method: 'POST',
     body: JSON.stringify({ message, gameweek, fixtureId, userId: getUserId() }),
   });
+}
+
+export type ChatStreamChunk =
+  | { type: 'chunk'; text: string }
+  | { type: 'done'; response: string; prediction: ChatResponseData['prediction']; accuracy: ChatResponseData['accuracy']; fixtureFound: boolean; identifiedFixture: ChatResponseData['identifiedFixture'] }
+  | { type: 'error'; error: string };
+
+/**
+ * POST /api/chat with stream:true — yields SSE chunks as they arrive.
+ * Usage: for await (const chunk of sendChatStream(...)) { ... }
+ */
+export async function* sendChatStream(
+  message: string,
+  gameweek: number,
+  fixtureId?: number,
+): AsyncGenerator<ChatStreamChunk> {
+  const res = await fetch(`${API_BASE}/api/chat`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'x-user-id': getUserId(),
+    },
+    body: JSON.stringify({ message, gameweek, fixtureId, userId: getUserId(), stream: true }),
+    credentials: 'include',
+  });
+
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ error: res.statusText }));
+    throw new Error((err as { error?: string }).error || `API error: ${res.status}`);
+  }
+
+  if (!res.body) throw new Error('No response body for stream');
+
+  const reader = res.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = '';
+
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split('\n');
+      buffer = lines.pop() ?? '';
+
+      for (const line of lines) {
+        const trimmed = line.trim();
+        if (!trimmed.startsWith('data:')) continue;
+        const raw = trimmed.slice(5).trim();
+        try {
+          yield JSON.parse(raw) as ChatStreamChunk;
+        } catch {
+          // malformed SSE line, skip
+        }
+      }
+    }
+  } finally {
+    reader.releaseLock();
+  }
 }
 
 /**

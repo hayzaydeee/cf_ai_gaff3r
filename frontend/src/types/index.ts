@@ -22,6 +22,7 @@ export interface ChatMessage {
   role: 'user' | 'assistant';
   content: string;
   timestamp: string;
+  streaming?: boolean;
   prediction?: PredictionSummary | null;
   metadata?: {
     fixtureId?: number;
