@@ -210,6 +210,8 @@ export async function* sendChatStream(
     credentials: 'include',
   });
 
+  console.log('[stream] status:', res.status, 'content-type:', res.headers.get('content-type'));
+
   if (!res.ok) {
     const err = await res.json().catch(() => ({ error: res.statusText }));
     throw new Error((err as { error?: string }).error || `API error: ${res.status}`);
@@ -236,10 +238,14 @@ export async function* sendChatStream(
         const raw = trimmed.slice(5).trim();
         try {
           const parsed = JSON.parse(raw) as ChatStreamChunk;
+          console.log('[stream] chunk type:', parsed.type);
           yield parsed;
-          if (parsed.type === 'done' || parsed.type === 'error') return;
-        } catch {
-          // malformed SSE line, skip
+          if (parsed.type === 'done' || parsed.type === 'error') {
+            console.log('[stream] returning after', parsed.type);
+            return;
+          }
+        } catch (e) {
+          console.warn('[stream] JSON parse error:', e, 'raw:', raw.slice(0, 100));
         }
       }
     }
