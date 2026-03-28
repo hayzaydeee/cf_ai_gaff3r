@@ -164,6 +164,8 @@ export async function handleChat(
       role: 'assistant',
       content: cleanResponse,
       timestamp: new Date().toISOString(),
+      simResult: simResult ?? undefined,
+      adjustmentNotes: adjustmentNotes.length > 0 ? adjustmentNotes : undefined,
       metadata: (resolvedFixtureId || predictionId) ? { fixtureId: resolvedFixtureId, predictionId } : undefined,
     };
     await doStub.fetch(new Request(`http://do/chat/${gameweek}`, { method: 'POST', body: JSON.stringify(userMsg) }));

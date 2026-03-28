@@ -183,7 +183,7 @@ export default {
           return secured(errorResponse('Invalid JSON body', 400), origin);
         }
 
-        const { message, gameweek, fixtureId } = body as Record<string, unknown>;
+        const { message, gameweek, fixtureId, stream } = body as Record<string, unknown>;
 
         if (typeof message !== 'string' || !message.trim()) {
           return secured(errorResponse('message must be a non-empty string', 400), origin);
@@ -208,7 +208,7 @@ export default {
         const validatedRequest = new Request(request.url, {
           method: 'POST',
           headers: request.headers,
-          body: JSON.stringify({ message: cleanMessage, gameweek, fixtureId, userId }),
+          body: JSON.stringify({ message: cleanMessage, gameweek, fixtureId, userId, stream }),
         });
         response = await handleChat(validatedRequest, userId, env, isAuthenticated, ctx);
         return secured(response, origin);

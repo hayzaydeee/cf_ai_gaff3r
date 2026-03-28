@@ -78,16 +78,19 @@ export default function MessageBubble({ message }: MessageBubbleProps) {
     const isEmpty = message.content.length === 0;
     const sections = !isUser && !isEmpty ? parseAssistantSections(message.content) : null;
 
-    // Premium layout for analysis messages that carry statistical model data
-    if (!isUser && !isEmpty && message.simResult) {
+    // Analysis layout: stream text directly into AnalysisBubble for fixture chats,
+    // or render final card when simResult is present.
+    if (!isUser && !isEmpty && (message.simResult || message.metadata?.fixtureId)) {
         return (
             <div className="msg-wrap msg-wrap--ai">
                 <div className="msg-avatar">⚽</div>
                 <div className="msg-bubble msg-bubble--ai msg-bubble--analysis">
                     <AnalysisBubble message={message} />
-                    <span className="msg-time">
-                        {new Date(message.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                    </span>
+                    {!isStreaming && (
+                        <span className="msg-time">
+                            {new Date(message.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                        </span>
+                    )}
                 </div>
             </div>
         );

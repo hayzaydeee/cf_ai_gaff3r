@@ -21,6 +21,8 @@ export interface ChatMessage {
   role: 'user' | 'assistant';
   content: string;
   timestamp: string;
+  simResult?: import('./api').SimResultPayload;
+  adjustmentNotes?: string[];
   metadata?: {
     fixtureId?: number;
     predictionId?: string;

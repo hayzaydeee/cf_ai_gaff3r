@@ -27,6 +27,7 @@ interface AnalysisBubbleProps {
 
 export default function AnalysisBubble({ message }: AnalysisBubbleProps) {
   const { simResult, adjustmentNotes, prediction } = message;
+  const isStreaming = message.streaming === true;
   const sections = parseAssistantSections(message.content) ?? [];
 
   // Derive team names from prediction or simResult context
@@ -46,17 +47,27 @@ export default function AnalysisBubble({ message }: AnalysisBubbleProps) {
         </div>
       ))}
 
-      {/* Fallback: plain text if no structured sections detected */}
+      {/* Fallback: plain text / streaming text before sections are detected */}
       {sections.length === 0 && (
         <div className="ab-plain">
           {message.content.split('\n').map((line, i) => (
             <p key={i} className="ab-plain-line">{line || '\u00A0'}</p>
           ))}
+          {isStreaming && <span className="ab-cursor" />}
         </div>
       )}
 
-      {/* ── Model output block ── */}
-      {simResult && (
+      {/* ── Model output block: skeleton while streaming, full render on done ── */}
+      {isStreaming && !simResult ? (
+        <div className="ab-model-block">
+          <span className="ab-block-label">Dixon-Coles · Monte Carlo · 15,000 simulations</span>
+          <div className="ab-skel ab-skel--bar" />
+          <div className="ab-two-col">
+            <div className="ab-skel ab-skel--box" />
+            <div className="ab-skel ab-skel--box" />
+          </div>
+        </div>
+      ) : simResult ? (
         <div className="ab-model-block">
           <span className="ab-block-label">
             Dixon-Coles · Monte Carlo · 15,000 simulations
@@ -89,10 +100,10 @@ export default function AnalysisBubble({ message }: AnalysisBubbleProps) {
             <AdjustmentNotes notes={adjustmentNotes} />
           )}
         </div>
-      )}
+      ) : null}
 
-      {/* ── Prediction card ── */}
-      {prediction && <PredictionCard prediction={prediction} />}
+      {/* ── Prediction card: only shown after streaming completes ── */}
+      {!isStreaming && prediction && <PredictionCard prediction={prediction} />}
 
       <style>{`
         .ab-wrap {
@@ -187,6 +198,37 @@ export default function AnalysisBubble({ message }: AnalysisBubbleProps) {
 
         @media (max-width: 560px) {
           .ab-two-col { grid-template-columns: 1fr; }
+        }
+
+        /* Streaming cursor */
+        .ab-cursor {
+          display: inline-block;
+          width: 2px;
+          height: 1em;
+          background: var(--color-orange);
+          margin-left: 2px;
+          vertical-align: text-bottom;
+          animation: ab-blink 1s step-end infinite;
+        }
+        @keyframes ab-blink { 0%, 100% { opacity: 1; } 50% { opacity: 0; } }
+
+        /* Skeleton shimmer */
+        .ab-skel {
+          border-radius: var(--radius-md);
+          background: linear-gradient(
+            90deg,
+            var(--color-border) 25%,
+            var(--color-beige-hover, #e8d5a8) 50%,
+            var(--color-border) 75%
+          );
+          background-size: 200% 100%;
+          animation: ab-shimmer 1.4s ease-in-out infinite;
+        }
+        .ab-skel--bar { height: 36px; }
+        .ab-skel--box { height: 90px; }
+        @keyframes ab-shimmer {
+          0% { background-position: 200% 0; }
+          100% { background-position: -200% 0; }
         }
       `}</style>
     </div>

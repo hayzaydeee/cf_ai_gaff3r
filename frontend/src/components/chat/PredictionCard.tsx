@@ -32,7 +32,7 @@ export default function PredictionCard({ prediction }: PredictionCardProps) {
                     className="pc-logo"
                     fallbackClassName="pc-logo-fallback"
                   />
-                  {prediction.homeTeam} {prediction.predictedScore.home} – {prediction.predictedScore.away} {prediction.awayTeam}
+                  {prediction.homeTeam} {prediction.homeScore} – {prediction.awayScore} {prediction.awayTeam}
                   <ClubLogo
                     teamName={prediction.awayTeam}
                     size={20}

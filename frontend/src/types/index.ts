@@ -44,10 +44,11 @@ export interface ChatMessage {
 }
 
 export interface PredictionSummary {
-  id: string;
+  id?: string;
   homeTeam: string;
   awayTeam: string;
-  predictedScore: { home: number; away: number };
+  homeScore: number;
+  awayScore: number;
   confidence: 'low' | 'medium' | 'high';
   reasoning: string;
 }

@@ -78,8 +78,7 @@ export function useChat(gameweek: number | null, fixtureId?: number) {
           setAllMessages(prev => prev.map(m =>
             m.id === streamId ? { ...m, content: m.content + chunk.text } : m
           ));
-        } else if (chunk.type === 'done') {
-          console.log('[useChat] done received, breaking');
+        } else if (chunk.type === 'done') {;
           setAllMessages(prev => prev.map(m =>
             m.id === streamId
               ? { ...m, content: chunk.response, streaming: false, prediction: chunk.prediction, simResult: chunk.simResult, adjustmentNotes: chunk.adjustmentNotes }
@@ -92,11 +91,9 @@ export function useChat(gameweek: number | null, fixtureId?: number) {
         }
       }
     } catch (err) {
-      console.log('[useChat] catch:', err);
       setError(err instanceof Error ? err.message : 'Failed to get response');
       setAllMessages(prev => prev.filter(m => m.id !== userMsg.id && m.id !== streamId));
     } finally {
-      console.log('[useChat] finally: setLoading(false)');
       setLoading(false);
     }
   }, [gameweek, fixtureId]);
