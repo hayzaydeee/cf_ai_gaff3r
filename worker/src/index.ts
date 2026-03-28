@@ -10,6 +10,7 @@ import { handleMigrateAnonymous } from './routes/migrate';
 import { getAuth, getSessionUserId } from './auth';
 import { runFplSnapshot } from './cron/fplSnapshot';
 import { runResolvePredictions } from './cron/resolvePredictions';
+import { isPromptInjection, sanitiseInput } from './utils/security';
 
 export { UserState } from './durable-objects/user-state';
 
@@ -30,6 +31,9 @@ const SECURITY_HEADERS: Record<string, string> = {
   'X-Frame-Options': 'DENY',
   'Referrer-Policy': 'strict-origin-when-cross-origin',
   'Permissions-Policy': 'geolocation=(), microphone=(), camera=()',
+  'Strict-Transport-Security': 'max-age=31536000; includeSubDomains',
+  // CSP: API-only worker — no HTML served, but defence-in-depth for any future changes
+  'Content-Security-Policy': "default-src 'none'; frame-ancestors 'none'",
 };
 
 // Chat message limits — prevent prompt stuffing and resource abuse
@@ -57,7 +61,7 @@ export default {
     }
   },
 
-  async fetch(request: Request, env: Env): Promise<Response> {
+  async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
     const url = new URL(request.url);
     const path = url.pathname;
     const origin = request.headers.get('Origin') ?? '';
@@ -84,6 +88,15 @@ export default {
       }
 
       // ── Public routes (no userId required) ──
+
+      // Rate-limit fixture/public endpoints by IP (CF-Connecting-IP) or fallback
+      if (path.startsWith('/api/fixtures') || path === '/api/gameweek/current' || path === '/api/match-context') {
+        const ipKey = request.headers.get('CF-Connecting-IP') ?? 'unknown';
+        const { success: fixturesOk } = await env.RATE_LIMITER_FIXTURES.limit({ key: ipKey });
+        if (!fixturesOk) {
+          return secured(errorResponse('Rate limit exceeded — slow down', 429), origin);
+        }
+      }
 
       if (path === '/api/gameweek/current' && request.method === 'GET') {
         response = await handleGetGameweek(env);
@@ -150,6 +163,12 @@ export default {
 
       // POST /api/chat — send a message
       if (path === '/api/chat' && request.method === 'POST') {
+        // Rate-limit chat by userId (authenticated or anonymous)
+        const { success: chatOk } = await env.RATE_LIMITER_CHAT.limit({ key: userId });
+        if (!chatOk) {
+          return secured(errorResponse('Rate limit exceeded — you\'re sending messages too quickly', 429), origin);
+        }
+
         // Validate Content-Type
         const contentType = request.headers.get('Content-Type') ?? '';
         if (!contentType.includes('application/json')) {
@@ -179,13 +198,19 @@ export default {
           return secured(errorResponse('fixtureId must be a positive integer', 400), origin);
         }
 
+        // Sanitise and check for prompt injection before hitting the LLM
+        const cleanMessage = sanitiseInput(message.trim());
+        if (isPromptInjection(cleanMessage)) {
+          return secured(errorResponse('Invalid message content', 400), origin);
+        }
+
         // Reconstruct a validated request to pass downstream
         const validatedRequest = new Request(request.url, {
           method: 'POST',
           headers: request.headers,
-          body: JSON.stringify({ message: message.trim(), gameweek, fixtureId, userId }),
+          body: JSON.stringify({ message: cleanMessage, gameweek, fixtureId, userId }),
         });
-        response = await handleChat(validatedRequest, userId, env, isAuthenticated);
+        response = await handleChat(validatedRequest, userId, env, isAuthenticated, ctx);
         return secured(response, origin);
       }
 

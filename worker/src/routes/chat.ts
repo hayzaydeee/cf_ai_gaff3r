@@ -19,6 +19,7 @@ import { fetchFixtures, fetchBootstrap } from '../services/fpl';
 import { fetchUpcomingMatches } from '../services/football-data';
 import { identifyFixture } from '../services/fixture-matcher';
 import { runPLModel, runStandardModel, formatModelBlock, type SimResult } from '../models';
+import { queryRelevantAnalyses, storeAnalysis } from '../services/vectorStore';
 
 /**
  * POST /api/chat
@@ -29,6 +30,7 @@ export async function handleChat(
   userId: string,
   env: Env,
   isAuthenticated = false,
+  ctx?: ExecutionContext,
 ): Promise<Response> {
   const body = await request.json() as ChatRequest;
   const { message, gameweek, fixtureId: providedFixtureId } = body;
@@ -113,11 +115,26 @@ export async function handleChat(
     }
   }
 
+  // Query Vectorize for relevant past analyses (RAG context)
+  let ragBlock: string | null = null;
+  if (matchContext && fixtureItem) {
+    try {
+      ragBlock = await queryRelevantAnalyses(
+        env,
+        matchContext.fixture.homeTeam,
+        matchContext.fixture.awayTeam,
+        matchContext.fixture.competition,
+      );
+    } catch (err) {
+      console.warn('RAG query failed, continuing without it:', err);
+    }
+  }
+
   let userPrompt: string;
   if (matchContext && matchContext.type === 'pl') {
-    userPrompt = buildPLUserMessage(matchContext, message, accuracy, modelBlock);
+    userPrompt = buildPLUserMessage(matchContext, message, accuracy, modelBlock, ragBlock);
   } else if (matchContext && matchContext.type === 'standard') {
-    userPrompt = buildStandardUserMessage(matchContext, message, accuracy, modelBlock);
+    userPrompt = buildStandardUserMessage(matchContext, message, accuracy, modelBlock, ragBlock);
   } else {
     // General football chat — no fixture context available
     userPrompt = `USER MESSAGE: "${message}"\n\n(No specific fixture data available. Provide general football analysis. If they're asking about a match you cannot identify, say so and offer general insights based on what you know.)`;
@@ -160,6 +177,22 @@ export async function handleChat(
     method: 'POST',
     body: JSON.stringify(assistantMsg),
   }));
+
+  // Store analysis in Vectorize (fire-and-forget, non-blocking)
+  if (aiResult.prediction && matchContext && fixtureItem) {
+    const storeId = `analysis_${crypto.randomUUID().slice(0, 16)}`;
+    const storePromise = storeAnalysis(env, storeId, aiResult.response, {
+      homeTeam: matchContext.fixture.homeTeam,
+      awayTeam: matchContext.fixture.awayTeam,
+      competition: matchContext.fixture.competition,
+      date: new Date().toISOString(),
+      predictedScore: `${aiResult.prediction.homeScore}-${aiResult.prediction.awayScore}`,
+    });
+    if (ctx) {
+      ctx.waitUntil(storePromise);
+    }
+    // If no ctx, the promise runs but we don't await it — acceptable for non-critical side effect
+  }
 
   // Step 9: Store prediction if one was generated and we have fixture data
   let storedPrediction: ChatResponse['prediction'] = null;

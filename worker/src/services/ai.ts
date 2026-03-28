@@ -7,6 +7,8 @@ import type { Confidence } from '../types/app';
 
 const PRIMARY_MODEL = '@cf/meta/llama-3.3-70b-instruct-fp8-fast';
 const FALLBACK_MODEL = '@cf/meta/llama-3.1-8b-instruct';
+const EMBED_MODEL = '@cf/baai/bge-small-en-v1.5';
+const GATEWAY_ID = 'gaff3r-gateway';
 
 export interface PredictionData {
   homeTeam: string;
@@ -71,7 +73,7 @@ async function callModel(
     ],
     max_tokens: 1024,
     temperature: 0.7,
-  });
+  }, { gateway: { id: GATEWAY_ID } });
 
   // Workers AI returns { response: string } for text generation
   if (typeof result === 'object' && result !== null && 'response' in result) {
@@ -155,6 +157,25 @@ function extractPredictionFromText(response: string): PredictionData | null {
     confidence,
     reasoning: 'Extracted from response text.',
   };
+}
+
+/**
+ * Generate a text embedding using the BGE-small model via AI Gateway.
+ * Returns a 768-dimension float array, or null on failure.
+ */
+export async function embedText(env: Env, text: string): Promise<number[] | null> {
+  try {
+    const result = await env.AI.run(
+      EMBED_MODEL as Parameters<typeof env.AI.run>[0],
+      { text: [text] } as Parameters<typeof env.AI.run>[1],
+      { gateway: { id: GATEWAY_ID } },
+    );
+    const data = (result as { data?: number[][] }).data;
+    return Array.isArray(data) && data.length > 0 ? data[0] : null;
+  } catch (err) {
+    console.warn('embedText failed:', err);
+    return null;
+  }
 }
 
 /**

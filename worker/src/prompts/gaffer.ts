@@ -98,6 +98,7 @@ export function buildPLUserMessage(
   userMessage: string,
   accuracy: AccuracyStats | null,
   modelBlock: string | null = null,
+  ragBlock: string | null = null,
 ): string {
   const { fixture, fplDifficulty, homeTeam, awayTeam } = context;
 
@@ -149,7 +150,7 @@ ${awayKeyPlayers}
 ${awayInjuries}
 ${awayTeam.setPieceTakers ? `Set Pieces: ${awayTeam.setPieceTakers}` : ''}
 
-${modelBlock ? `\n${modelBlock}\n` : ''}
+${modelBlock ? `\n${modelBlock}\n` : ''}${ragBlock ? `\n${ragBlock}\n` : ''}
 ═══ YOUR TRACK RECORD ═══
 ${accuracyBlock}`;
 }
@@ -162,6 +163,7 @@ export function buildStandardUserMessage(
   userMessage: string,
   accuracy: AccuracyStats | null,
   modelBlock: string | null = null,
+  ragBlock: string | null = null,
 ): string {
   const { fixture, homeTeam, awayTeam } = context;
 
@@ -189,7 +191,7 @@ Goals: ${awayTeam.goalsFor} scored, ${awayTeam.goalsAgainst} conceded (GD: ${awa
 Last 5: ${awayTeam.form.join(' ')} (${awayTeam.formSummary})
 Recent Results:
 ${awayTeam.recentResults.map(r => `  ${r.home ? 'H' : 'A'} vs ${r.opponent}: ${r.goalsFor}-${r.goalsAgainst} (${r.result})`).join('\n')}
-${modelBlock ? `\n${modelBlock}\n` : ''}
+${modelBlock ? `\n${modelBlock}\n` : ''}${ragBlock ? `\n${ragBlock}\n` : ''}
 ═══ YOUR TRACK RECORD ═══
 ${accuracyBlock}`;
 }

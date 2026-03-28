@@ -33,7 +33,7 @@ database_id = "5455879c-e1fb-468b-b1e8-8da67cb44c53"
 [[vectorize]]
 binding = "VECTORIZE"
 index_name = "gaff3r-analyses"
-# remote = true — enable in Phase 7 after: wrangler vectorize create gaff3r-analyses --dimensions=768 --metric=cosine
+remote = true 
 
 # Rate Limiting
 # namespace_id is an arbitrary integer — unique per limit tier
