@@ -23,6 +23,7 @@ export interface ChatMessage {
   timestamp: string;
   simResult?: import('./api').SimResultPayload;
   adjustmentNotes?: string[];
+  typedPrediction?: import('./api').TypedPredictionPayload;
   metadata?: {
     fixtureId?: number;
     predictionId?: string;

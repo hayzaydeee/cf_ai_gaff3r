@@ -4,6 +4,7 @@
 
 import type { Env } from '../types/env';
 import type { Confidence } from '../types/app';
+import type { TypedPredictionPayload, PredictionType } from '../types/api';
 
 const PRIMARY_MODEL = '@cf/meta/llama-3.3-70b-instruct-fp8-fast';
 const FALLBACK_MODEL = '@cf/meta/llama-3.1-8b-instruct';
@@ -19,9 +20,12 @@ export interface PredictionData {
   reasoning: string;
 }
 
+export type { TypedPredictionPayload };
+
 export interface AIResult {
   response: string;
   prediction: PredictionData | null;
+  typedPrediction: TypedPredictionPayload | null;
 }
 
 /**
@@ -47,14 +51,15 @@ export async function runAnalysis(
   }
 
   // Extract prediction from response
-  const prediction = extractPrediction(response);
+  const typedPrediction = extractTypedPrediction(response);
+  const prediction = typedPredictionToPredictionData(typedPrediction) ?? extractPrediction(response);
 
   // Clean the response — remove the PREDICTION_JSON block from the visible text
   const cleanResponse = response
     .replace(/<<<PREDICTION_JSON>>>[\s\S]*?<<<END_PREDICTION_JSON>>>/g, '')
     .trim();
 
-  return { response: cleanResponse, prediction };
+  return { response: cleanResponse, prediction, typedPrediction };
 }
 
 /**
@@ -84,8 +89,55 @@ async function callModel(
 }
 
 /**
- * Extract prediction JSON from the AI response via regex.
- * No second LLM call needed — the model embeds it inline.
+ * Extract a TypedPredictionPayload from any PREDICT sub-type JSON block.
+ */
+export function extractTypedPrediction(response: string): TypedPredictionPayload | null {
+  const match = response.match(/<<<PREDICTION_JSON>>>([\s\S]*?)<<<END_PREDICTION_JSON>>>/);
+  if (!match) return null;
+
+  try {
+    const parsed = JSON.parse(match[1].trim());
+    if (!parsed.type || !parsed.homeTeam || !parsed.awayTeam) return null;
+
+    const base = { homeTeam: parsed.homeTeam as string, awayTeam: parsed.awayTeam as string };
+    const type = parsed.type as PredictionType;
+
+    if (type === 'result') {
+      if (typeof parsed.homeScore !== 'number' || typeof parsed.awayScore !== 'number') return null;
+      return { ...base, type, homeScore: parsed.homeScore, awayScore: parsed.awayScore, confidence: parsed.confidence ?? 'medium', reasoning: parsed.reasoning ?? '' };
+    }
+    if (type === 'scorer') {
+      if (!Array.isArray(parsed.scorers)) return null;
+      return { ...base, type, scorers: parsed.scorers };
+    }
+    if (type === 'lineup') {
+      return { ...base, type, homeLineup: parsed.homeLineup, awayLineup: parsed.awayLineup };
+    }
+    if (type === 'btts') {
+      return { ...base, type, btts: parsed.btts, confidence: parsed.confidence ?? 'medium', overUnder: parsed.overUnder };
+    }
+    return null;
+  } catch (err) {
+    console.warn('Failed to parse typed prediction JSON:', err);
+    return null;
+  }
+}
+
+/** Convert a result-type TypedPredictionPayload to legacy PredictionData for backward compat. */
+function typedPredictionToPredictionData(typed: TypedPredictionPayload | null): PredictionData | null {
+  if (!typed || typed.type !== 'result' || typed.homeScore === undefined || typed.awayScore === undefined) return null;
+  return {
+    homeTeam: typed.homeTeam,
+    awayTeam: typed.awayTeam,
+    homeScore: typed.homeScore,
+    awayScore: typed.awayScore,
+    confidence: (typed.confidence ?? 'medium') as Confidence,
+    reasoning: typed.reasoning ?? '',
+  };
+}
+
+/**
+ * Extract result-type prediction from the AI response (legacy / fallback).
  */
 export function extractPrediction(response: string): PredictionData | null {
   const match = response.match(/<<<PREDICTION_JSON>>>([\s\S]*?)<<<END_PREDICTION_JSON>>>/);
@@ -96,15 +148,15 @@ export function extractPrediction(response: string): PredictionData | null {
   try {
     const parsed = JSON.parse(match[1].trim());
 
-    // Validate required fields
+    // New typed format: only extract if it's a result type
+    if (parsed.type && parsed.type !== 'result') return null;
+
     if (
       typeof parsed.homeTeam !== 'string' ||
       typeof parsed.awayTeam !== 'string' ||
       typeof parsed.homeScore !== 'number' ||
-      typeof parsed.awayScore !== 'number' ||
-      !['low', 'medium', 'high'].includes(parsed.confidence)
+      typeof parsed.awayScore !== 'number'
     ) {
-      console.warn('Invalid prediction structure:', parsed);
       return null;
     }
 
@@ -113,7 +165,7 @@ export function extractPrediction(response: string): PredictionData | null {
       awayTeam: parsed.awayTeam,
       homeScore: parsed.homeScore,
       awayScore: parsed.awayScore,
-      confidence: parsed.confidence as Confidence,
+      confidence: (['low', 'medium', 'high'].includes(parsed.confidence) ? parsed.confidence : 'medium') as Confidence,
       reasoning: parsed.reasoning ?? '',
     };
   } catch (err) {
@@ -172,7 +224,7 @@ export async function runAnalysisStreaming(
   systemPrompt: string,
   userMessage: string,
   extraDoneData: Record<string, unknown>,
-  onComplete: (response: string, prediction: PredictionData | null) => Promise<void>,
+  onComplete: (response: string, prediction: PredictionData | null, typedPrediction: TypedPredictionPayload | null) => Promise<void>,
 ): Promise<ReadableStream<Uint8Array>> {
   // Workers AI with stream:true returns ReadableStream<Uint8Array>
   const aiStream = await env.AI.run(
@@ -238,17 +290,18 @@ export async function runAnalysisStreaming(
       }
 
       // Full response assembled — extract prediction and clean text
-      const prediction = extractPrediction(accumulated);
+      const typedPrediction = extractTypedPrediction(accumulated);
+      const prediction = typedPredictionToPredictionData(typedPrediction) ?? extractPrediction(accumulated);
       const cleanResponse = accumulated
         .replace(/<<<PREDICTION_JSON>>>[\s\S]*?<<<END_PREDICTION_JSON>>>/g, '')
         .trim();
 
-      emit({ type: 'done', response: cleanResponse, prediction, ...extraDoneData });
+      emit({ type: 'done', response: cleanResponse, prediction, typedPrediction, ...extraDoneData });
       controller.close();
 
       // Post-processing runs after stream closes so it never blocks the done event
       try {
-        await onComplete(cleanResponse, prediction);
+        await onComplete(cleanResponse, prediction, typedPrediction);
       } catch (err) {
         console.warn('Streaming onComplete failed:', err);
       }

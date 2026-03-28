@@ -1,7 +1,7 @@
 // Frontend API client
 // Handles userId generation, auth headers, and typed fetch wrappers
 
-import type { Fixture, Prediction, PredictionSummary, ChatMessage, SimResult } from '../types';
+import type { Fixture, Prediction, PredictionSummary, ChatMessage, SimResult, TypedPrediction } from '../types';
 
 const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8787';
 
@@ -188,7 +188,7 @@ export function sendChat(message: string, gameweek: number, fixtureId?: number):
 
 export type ChatStreamChunk =
   | { type: 'chunk'; text: string }
-  | { type: 'done'; response: string; prediction: ChatResponseData['prediction']; accuracy: ChatResponseData['accuracy']; fixtureFound: boolean; identifiedFixture: ChatResponseData['identifiedFixture']; simResult?: SimResult; adjustmentNotes?: string[] }
+  | { type: 'done'; response: string; prediction: ChatResponseData['prediction']; accuracy: ChatResponseData['accuracy']; fixtureFound: boolean; identifiedFixture: ChatResponseData['identifiedFixture']; simResult?: SimResult; adjustmentNotes?: string[]; typedPrediction?: TypedPrediction }
   | { type: 'error'; error: string };
 
 /**

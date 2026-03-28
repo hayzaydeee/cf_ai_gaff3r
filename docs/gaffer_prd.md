@@ -19,6 +19,7 @@
 10. [Data Architecture](#10-data-architecture)
 11. [Data Sources & Integration](#11-data-sources--integration)
 12. [AI & Prompt Engineering](#12-ai--prompt-engineering)
+    - [12.X Prediction Intelligence: Typed Sub-types & Visual Output](#12x-prediction-intelligence-typed-sub-types--visual-output)
 13. [API Specification](#13-api-specification)
 14. [Frontend Specification](#14-frontend-specification)
 15. [Performance Requirements](#15-performance-requirements)
@@ -858,6 +859,127 @@ const response = await env.AI.run("@cf/meta/llama-3.3-70b-instruct-fp8-fast", {
   }
 });
 ```
+
+---
+
+## 12.X Prediction Intelligence: Typed Sub-types & Visual Output
+
+This section documents the three approaches evaluated for extending Gaff3r's prediction capability beyond the single `result` type. Approach 1 is **implemented in V1**. Approaches 2 and 3 are planned for V2/V3.
+
+---
+
+### Approach 1 — Typed Prediction Sub-types ✅ (V1 — Implemented)
+
+**Problem:** The LLM previously responded to all prediction queries with the same scoreline format. Questions like "who will score?" or "both teams to score?" received generic match summaries instead of targeted market picks.
+
+**Solution:** Extend the `<<<PREDICTION_JSON>>>` block with a `type` field. The Gaffer now detects intent from the user message and selects the appropriate sub-type, each with its own structured JSON schema and text response format.
+
+#### Sub-types
+
+| Type | Trigger phrases | JSON schema | Frontend component |
+|---|---|---|---|
+| `result` | "who wins", "predict", "your pick", "who you got" | `homeScore`, `awayScore`, `confidence`, `reasoning` | `PredictionCard` (existing) |
+| `scorer` | "who will score", "scorer pick", "first goal", "goalscorer" | `scorers[]` with `name`, `team`, `likelihood`, `goals` | `ScorerCard` |
+| `lineup` | "lineup", "predicted XI", "who starts", "team selection" | `homeLineup`/`awayLineup` with `formation`, `keyPicks[]` | `LineupGrid` |
+| `btts` | "both teams to score", "BTTS", "over/under", "over 2.5" | `btts`, `confidence`, `overUnder` | `ProbabilityGauge` |
+
+#### Architecture
+
+- **Worker** (`prompts/gaffer.ts`): PREDICT mode now has four sub-mode definitions, each with a distinct text structure and JSON schema.
+- **Worker** (`services/ai.ts`): `extractTypedPrediction()` parses the `type` field and validates sub-type specific fields. `AIResult` now includes both `prediction` (backward compat, result-only) and `typedPrediction` (all sub-types).
+- **Worker** (`routes/chat.ts`): `typedPrediction` passed in SSE done event and persisted to Durable Object alongside `simResult`.
+- **Frontend** (`types/index.ts`): `TypedPrediction` union type covering all sub-types; `ChatMessage` extended with `typedPrediction?`.
+- **Frontend** (`AnalysisBubble.tsx`): Routes to `ScorerCard`, `LineupGrid`, `ProbabilityGauge`, or `PredictionCard` based on `typedPrediction.type`.
+
+#### Key design decisions
+
+- A single `<<<PREDICTION_JSON>>>` block is reused — only the schema changes per type. This keeps the LLM instruction compact.
+- `result` type still produces a `PredictionData` for backward compatibility with the predictions history and D1 storage pipeline.
+- `scorer` and `lineup` predictions are **not** stored in the D1 `predictions` table (only scoreline predictions are tracked for accuracy). Scorer/lineup data persists in the Durable Object chat history only.
+- The Dixon-Coles model block and outcome visualisations (`OutcomeBar`, `ScorelineGrid`, `XGComparison`) only render for `result` type — they don't apply to scorer or BTTS queries.
+
+---
+
+### Approach 2 — Free-form VISUAL_JSON (V2)
+
+**Problem:** Approach 1 hardcodes a fixed set of prediction types. As the product grows, adding new market types requires updating the prompt, adding JSON schemas, writing new components, and adding routing logic — every time.
+
+**Solution:** Give the LLM a declarative `VISUAL_JSON` block where it can compose any combination of registered visual components. The frontend has a component registry; the LLM declares intent and component list; the frontend renders whatever is registered.
+
+#### How it works
+
+```
+<<<VISUAL_JSON>>>
+{
+  "intent": "scorer_threat_analysis",
+  "components": [
+    { "type": "radar", "data": { "team": "Arsenal", "metrics": { ... } } },
+    { "type": "comparison_bar", "data": { "home": { ... }, "away": { ... } } }
+  ]
+}
+<<<END_VISUAL_JSON>>>
+```
+
+The frontend's `VisualRenderer.tsx` looks up each `type` in `registry.ts`. Unknown types render a "component not yet registered" placeholder rather than crashing. New visual types are added by registering them in the registry — no routing changes needed.
+
+#### Scaffold status
+
+The architecture is scaffolded at `frontend/src/components/chat/visuals/`:
+- `registry.ts` — `registerVisual()`, `getVisual()`, `parseVisualSpec()`, `stripVisualBlock()`
+- `VisualRenderer.tsx` — component lookup and render loop with unknown-type fallback
+
+No visual components are registered yet. The system prompt additions and worker-side `VISUAL_JSON` parsing are deferred to V2.
+
+#### Planned visual component types
+
+| Type | Description |
+|---|---|
+| `heatmap` | Pass/shot/pressure heatmap for a team or player |
+| `timeline` | Match event timeline (goals, cards, subs) |
+| `radar` | Team attribute radar (attack, defence, form, xG, etc.) |
+| `comparison_bar` | Side-by-side stat bars for two teams |
+| `scatter` | xG vs goals scatter for a player over N games |
+| `form_chart` | Last 10 results visualised as a streak bar |
+
+#### Tradeoffs vs Approach 1
+
+| | Approach 1 | Approach 2 |
+|---|---|---|
+| Adding new types | Change prompt + schema + component + routing | Register one component, prompt already open-ended |
+| Type safety | Fully typed per sub-type | Dynamic registry; TypeScript at boundaries |
+| LLM reliability | High (fixed schemas) | Medium (LLM must know registered type names) |
+| Implementation cost | Medium | Higher (registry + new prompt mode) |
+
+---
+
+### Approach 3 — Two-Pass Intent Classifier (V3)
+
+**Problem:** Both Approaches 1 and 2 rely on the same LLM to both detect intent and produce the response. If the intent detection is wrong (e.g., a scorer question triggers a result prediction), the response is still wrong — just more structured. Edge cases (multi-intent queries, ambiguous phrasing) are handled only by prompt engineering.
+
+**Solution:** A dedicated fast classifier pass before the main Gaffer call. A small model (Llama 3.1 8B or a custom classifier) reads the user message and returns a structured intent object. The main Gaffer call then receives the pre-classified intent in its context, removing the ambiguity.
+
+#### Pipeline
+
+```
+User message
+    │
+    ▼
+[Pass 1] Intent classifier (Llama 3.1 8B, ~100ms)
+    └─ { intent: "scorer", targets: ["Arsenal"], context: "anytime_scorer" }
+    │
+    ▼
+[Pass 2] Gaffer specialist call (Llama 3.3 70B)
+    └─ Receives: USER_INTENT: scorer/anytime_scorer
+    └─ Receives: full match context
+    └─ Returns: specialist scorer response + PREDICTION_JSON
+```
+
+#### Why it's V3
+
+- **Latency cost:** Two sequential LLM calls adds ~200-400ms before streaming begins. Acceptable at V3 scale; premature optimisation at V1/V2.
+- **Infrastructure:** Requires Workers AI Gateway analytics to measure classifier accuracy. Need baseline data from V1/V2 intent handling first.
+- **Value ceiling:** Most intent ambiguity is solved by Approach 1's sub-type signals. Two-pass is worth it when Approach 1 misfire rate exceeds ~10% of sessions — that's a V3 problem.
+- **Specialist prompts:** The real unlock of Approach 3 is per-intent specialist system prompts (a scorer specialist prompt optimised for that task, a lineup specialist, etc.). These require separate prompt engineering and evaluation cycles.
 
 ---
 

@@ -1,5 +1,27 @@
 // API request/response types
 
+// Typed prediction payload — covers all PREDICT sub-types
+export type PredictionType = 'result' | 'scorer' | 'lineup' | 'btts';
+
+export interface TypedPredictionPayload {
+  type: PredictionType;
+  homeTeam: string;
+  awayTeam: string;
+  // result fields
+  homeScore?: number;
+  awayScore?: number;
+  confidence?: 'low' | 'medium' | 'high';
+  reasoning?: string;
+  // scorer fields
+  scorers?: { name: string; team: string; likelihood: 'likely' | 'possible' | 'outside'; goals: number }[];
+  // lineup fields
+  homeLineup?: { formation: string; keyPicks: string[] };
+  awayLineup?: { formation: string; keyPicks: string[] };
+  // btts fields
+  btts?: boolean;
+  overUnder?: { line: number; pick: 'over' | 'under' };
+}
+
 // Serialisable mirror of SimResult — safe to include in SSE JSON payloads
 export interface SimResultPayload {
   lambda: number;

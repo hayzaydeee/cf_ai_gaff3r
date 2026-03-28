@@ -8,6 +8,7 @@ import AnalysisBubble from './AnalysisBubble';
 
 interface MessageBubbleProps {
     message: ChatMessage;
+    showModelBlock?: boolean;
 }
 
 interface Section {
@@ -72,7 +73,7 @@ export function parseAssistantSections(content: string): Section[] | null {
   return null;
 }
 
-export default function MessageBubble({ message }: MessageBubbleProps) {
+export default function MessageBubble({ message, showModelBlock = true }: MessageBubbleProps) {
     const isUser = message.role === 'user';
     const isStreaming = message.streaming === true;
     const isEmpty = message.content.length === 0;
@@ -85,7 +86,7 @@ export default function MessageBubble({ message }: MessageBubbleProps) {
             <div className="msg-wrap msg-wrap--ai">
                 <div className="msg-avatar">⚽</div>
                 <div className="msg-bubble msg-bubble--ai msg-bubble--analysis">
-                    <AnalysisBubble message={message} />
+                    <AnalysisBubble message={message} showModelBlock={showModelBlock} />
                     {!isStreaming && (
                         <span className="msg-time">
                             {new Date(message.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}

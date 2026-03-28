@@ -1,6 +1,41 @@
 // Shared frontend types
 // Re-exports from worker types where applicable
 
+// ── Typed Prediction Sub-types ──
+
+export type PredictionType = 'result' | 'scorer' | 'lineup' | 'btts';
+
+export interface ScorerPick {
+  name: string;
+  team: string;
+  likelihood: 'likely' | 'possible' | 'outside';
+  goals: number;
+}
+
+export interface LineupData {
+  formation: string;
+  keyPicks: string[];
+}
+
+export interface TypedPrediction {
+  type: PredictionType;
+  homeTeam: string;
+  awayTeam: string;
+  // result
+  homeScore?: number;
+  awayScore?: number;
+  confidence?: 'low' | 'medium' | 'high';
+  reasoning?: string;
+  // scorer
+  scorers?: ScorerPick[];
+  // lineup
+  homeLineup?: LineupData;
+  awayLineup?: LineupData;
+  // btts
+  btts?: boolean;
+  overUnder?: { line: number; pick: 'over' | 'under' };
+}
+
 export interface SimResult {
   lambda: number;
   mu: number;
@@ -37,6 +72,7 @@ export interface ChatMessage {
   prediction?: PredictionSummary | null;
   simResult?: SimResult;
   adjustmentNotes?: string[];
+  typedPrediction?: TypedPrediction;
   metadata?: {
     fixtureId?: number;
     predictionId?: string;

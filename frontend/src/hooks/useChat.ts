@@ -81,7 +81,7 @@ export function useChat(gameweek: number | null, fixtureId?: number) {
         } else if (chunk.type === 'done') {;
           setAllMessages(prev => prev.map(m =>
             m.id === streamId
-              ? { ...m, content: chunk.response, streaming: false, prediction: chunk.prediction, simResult: chunk.simResult, adjustmentNotes: chunk.adjustmentNotes }
+              ? { ...m, content: chunk.response, streaming: false, prediction: chunk.prediction, simResult: chunk.simResult, adjustmentNotes: chunk.adjustmentNotes, typedPrediction: chunk.typedPrediction }
               : m
           ));
           setLastAccuracy(chunk.accuracy);

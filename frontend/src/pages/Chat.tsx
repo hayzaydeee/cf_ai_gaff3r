@@ -154,9 +154,16 @@ export default function Chat() {
             </div>
           )}
 
-          {messages.map(msg => (
-            <MessageBubble key={msg.id} message={msg} />
-          ))}
+          {(() => {
+            const firstSimIdx = messages.findIndex(m => m.simResult);
+            return messages.map((msg, i) => (
+              <MessageBubble
+                key={msg.id}
+                message={msg}
+                showModelBlock={firstSimIdx === -1 || i === firstSimIdx}
+              />
+            ));
+          })()}
 
           {error && (
             <div className="chat-error">⚠️ {error}</div>

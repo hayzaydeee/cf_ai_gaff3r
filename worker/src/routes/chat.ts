@@ -150,6 +150,7 @@ export async function handleChat(
   const runPostProcessing = async (
     cleanResponse: string,
     prediction: import('../services/ai').PredictionData | null,
+    typedPrediction: import('../types/api').TypedPredictionPayload | null = null,
   ) => {
     const userMsg: ChatMessage = {
       id: `msg_${crypto.randomUUID().slice(0, 8)}`,
@@ -166,6 +167,7 @@ export async function handleChat(
       timestamp: new Date().toISOString(),
       simResult: simResult ?? undefined,
       adjustmentNotes: adjustmentNotes.length > 0 ? adjustmentNotes : undefined,
+      typedPrediction: typedPrediction ?? undefined,
       metadata: (resolvedFixtureId || predictionId) ? { fixtureId: resolvedFixtureId, predictionId } : undefined,
     };
     await doStub.fetch(new Request(`http://do/chat/${gameweek}`, { method: 'POST', body: JSON.stringify(userMsg) }));

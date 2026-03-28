@@ -1,9 +1,12 @@
 // Premium analysis response layout — shown when a message has simResult data.
-// Renders: text section cards → model output block → PredictionCard
+// Renders: text section cards → model output block → typed prediction card
 
 import type { ChatMessage } from '../../types';
 import { parseAssistantSections } from './MessageBubble';
 import PredictionCard from './PredictionCard';
+import ScorerCard from './ScorerCard';
+import LineupGrid from './LineupGrid';
+import ProbabilityGauge from './ProbabilityGauge';
 import OutcomeBar from './OutcomeBar';
 import ScorelineGrid from './ScorelineGrid';
 import XGComparison from './XGComparison';
@@ -23,12 +26,21 @@ function getSectionIcon(header: string): string {
 
 interface AnalysisBubbleProps {
   message: ChatMessage;
+  showModelBlock?: boolean;
 }
 
-export default function AnalysisBubble({ message }: AnalysisBubbleProps) {
-  const { simResult, adjustmentNotes, prediction } = message;
+function stripPredictionBlock(content: string): string {
+  return content
+    .replace(/<<<PREDICTION_JSON>>>[\s\S]*?<<<END_PREDICTION_JSON>>>/g, '')
+    .replace(/<<<PREDICTION_JSON>>>[\s\S]*/g, '')
+    .trim();
+}
+
+export default function AnalysisBubble({ message, showModelBlock = true }: AnalysisBubbleProps) {
+  const { simResult, adjustmentNotes, prediction, typedPrediction } = message;
   const isStreaming = message.streaming === true;
-  const sections = parseAssistantSections(message.content) ?? [];
+  const displayContent = stripPredictionBlock(message.content);
+  const sections = parseAssistantSections(displayContent) ?? [];
 
   // Derive team names from prediction or simResult context
   const homeTeam = prediction?.homeTeam ?? 'Home';
@@ -50,15 +62,15 @@ export default function AnalysisBubble({ message }: AnalysisBubbleProps) {
       {/* Fallback: plain text / streaming text before sections are detected */}
       {sections.length === 0 && (
         <div className="ab-plain">
-          {message.content.split('\n').map((line, i) => (
+          {displayContent.split('\n').map((line, i) => (
             <p key={i} className="ab-plain-line">{line || '\u00A0'}</p>
           ))}
           {isStreaming && <span className="ab-cursor" />}
         </div>
       )}
 
-      {/* ── Model output block: skeleton while streaming, full render on done ── */}
-      {isStreaming && !simResult ? (
+      {/* ── Model output block: only on first occurrence ── */}
+      {showModelBlock && isStreaming && !simResult ? (
         <div className="ab-model-block">
           <span className="ab-block-label">Dixon-Coles · Monte Carlo · 15,000 simulations</span>
           <div className="ab-skel ab-skel--bar" />
@@ -67,7 +79,7 @@ export default function AnalysisBubble({ message }: AnalysisBubbleProps) {
             <div className="ab-skel ab-skel--box" />
           </div>
         </div>
-      ) : simResult ? (
+      ) : showModelBlock && simResult ? (
         <div className="ab-model-block">
           <span className="ab-block-label">
             Dixon-Coles · Monte Carlo · 15,000 simulations
@@ -102,8 +114,35 @@ export default function AnalysisBubble({ message }: AnalysisBubbleProps) {
         </div>
       ) : null}
 
-      {/* ── Prediction card: only shown after streaming completes ── */}
-      {!isStreaming && prediction && <PredictionCard prediction={prediction} />}
+      {/* ── Typed prediction card: routed by sub-type after streaming completes ── */}
+      {!isStreaming && typedPrediction?.type === 'scorer' && typedPrediction.scorers && (
+        <ScorerCard
+          homeTeam={typedPrediction.homeTeam}
+          awayTeam={typedPrediction.awayTeam}
+          scorers={typedPrediction.scorers}
+        />
+      )}
+      {!isStreaming && typedPrediction?.type === 'lineup' && (
+        <LineupGrid
+          homeTeam={typedPrediction.homeTeam}
+          awayTeam={typedPrediction.awayTeam}
+          homeLineup={typedPrediction.homeLineup}
+          awayLineup={typedPrediction.awayLineup}
+        />
+      )}
+      {!isStreaming && typedPrediction?.type === 'btts' && (
+        <ProbabilityGauge
+          homeTeam={typedPrediction.homeTeam}
+          awayTeam={typedPrediction.awayTeam}
+          btts={typedPrediction.btts}
+          confidence={typedPrediction.confidence}
+          overUnder={typedPrediction.overUnder}
+        />
+      )}
+      {/* Fallback: result type uses PredictionCard */}
+      {!isStreaming && (!typedPrediction || typedPrediction.type === 'result') && prediction && (
+        <PredictionCard prediction={prediction} />
+      )}
 
       <style>{`
         .ab-wrap {
@@ -147,8 +186,21 @@ export default function AnalysisBubble({ message }: AnalysisBubbleProps) {
           margin: 0;
         }
 
-        /* Plain fallback */
-        .ab-plain { display: flex; flex-direction: column; gap: 2px; }
+        /* Plain fallback — styled as a card */
+        .ab-plain {
+          display: flex;
+          flex-direction: column;
+          gap: 4px;
+          background: var(--color-cream);
+          border: 1px solid var(--color-border);
+          border-radius: var(--radius-md);
+          padding: 12px 14px;
+          box-shadow: 0 1px 3px rgba(36, 27, 22, 0.05);
+        }
+        [data-theme="dark"] .ab-plain {
+          background: rgba(255, 255, 255, 0.04);
+          border-color: rgba(255, 255, 255, 0.08);
+        }
         .ab-plain-line {
           font-family: 'EB Garamond', serif;
           font-size: 15px;
