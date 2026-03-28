@@ -4,6 +4,7 @@
 
 import type { ChatMessage } from '../../types';
 import PredictionCard from './PredictionCard';
+import AnalysisBubble from './AnalysisBubble';
 
 interface MessageBubbleProps {
     message: ChatMessage;
@@ -73,13 +74,37 @@ export function parseAssistantSections(content: string): Section[] | null {
 
 export default function MessageBubble({ message }: MessageBubbleProps) {
     const isUser = message.role === 'user';
-  const sections = !isUser ? parseAssistantSections(message.content) : null;
+    const isStreaming = message.streaming === true;
+    const isEmpty = message.content.length === 0;
+    const sections = !isUser && !isEmpty ? parseAssistantSections(message.content) : null;
+
+    // Premium layout for analysis messages that carry statistical model data
+    if (!isUser && !isEmpty && message.simResult) {
+        return (
+            <div className="msg-wrap msg-wrap--ai">
+                <div className="msg-avatar">⚽</div>
+                <div className="msg-bubble msg-bubble--ai msg-bubble--analysis">
+                    <AnalysisBubble message={message} />
+                    <span className="msg-time">
+                        {new Date(message.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                    </span>
+                </div>
+            </div>
+        );
+    }
 
     return (
         <div className={`msg-wrap ${isUser ? 'msg-wrap--user' : 'msg-wrap--ai'}`}>
             {!isUser && <div className="msg-avatar">⚽</div>}
 
             <div className={`msg-bubble ${isUser ? 'msg-bubble--user' : 'msg-bubble--ai'}`}>
+                {/* Typing indicator when streaming with no content yet */}
+                {isStreaming && isEmpty && (
+                    <div className="msg-typing">
+                        <span /><span /><span />
+                    </div>
+                )}
+
                 {/* Structured sections */}
                 {sections ? (
                     <div className="msg-sections">
@@ -199,6 +224,34 @@ export default function MessageBubble({ message }: MessageBubbleProps) {
           opacity: 0.55;
           margin-top: 6px;
           text-align: right;
+        }
+
+        /* Analysis layout — wider padding for card content */
+        .msg-bubble--analysis {
+          padding: 10px;
+          max-width: 100%;
+        }
+
+        /* Typing indicator */
+        .msg-typing {
+          display: flex;
+          gap: 4px;
+          align-items: center;
+          padding: 2px 0;
+        }
+        .msg-typing span {
+          width: 7px;
+          height: 7px;
+          border-radius: 50%;
+          background: var(--color-orange);
+          opacity: 0.6;
+          animation: msg-bounce 1.2s ease-in-out infinite;
+        }
+        .msg-typing span:nth-child(2) { animation-delay: 0.2s; }
+        .msg-typing span:nth-child(3) { animation-delay: 0.4s; }
+        @keyframes msg-bounce {
+          0%, 80%, 100% { transform: translateY(0); opacity: 0.6; }
+          40% { transform: translateY(-5px); opacity: 1; }
         }
       `}</style>
         </div>

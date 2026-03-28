@@ -1,5 +1,17 @@
 // API request/response types
 
+// Serialisable mirror of SimResult — safe to include in SSE JSON payloads
+export interface SimResultPayload {
+  lambda: number;
+  mu: number;
+  homeWinPct: number;
+  drawPct: number;
+  awayWinPct: number;
+  topScorelinesWithPct: { home: number; away: number; probability: number }[];
+  mostLikelyScore: { home: number; away: number; probability: number };
+  confidence: 'low' | 'medium' | 'high';
+}
+
 export interface ChatRequest {
   message: string;
   gameweek: number;
@@ -25,6 +37,8 @@ export interface ChatResponse {
   };
   fixtureFound: boolean;
   dataSource: 'fpl' | 'football-data' | null;
+  simResult?: SimResultPayload;
+  adjustmentNotes?: string[];
   identifiedFixture: {
     id: number;
     homeTeam: string;

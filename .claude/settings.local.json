@@ -8,7 +8,11 @@
       "Bash(npm install:*)",
       "Bash(npm run:*)",
       "Bash(grep -v \"npm warn\\\\|npm notice\\\\|^$\")",
-      "mcp__claude_ai_Cloudflare_Developer_Platform__search_cloudflare_documentation"
+      "mcp__claude_ai_Cloudflare_Developer_Platform__search_cloudflare_documentation",
+      "mcp__plugin_context-mode_context-mode__ctx_execute",
+      "Bash(npx vitest:*)",
+      "mcp__plugin_context-mode_context-mode__ctx_batch_execute",
+      "mcp__plugin_context-mode_context-mode__ctx_search"
     ]
   }
 }

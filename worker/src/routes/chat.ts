@@ -18,7 +18,7 @@ import { SYSTEM_PROMPT, buildPLUserMessage, buildStandardUserMessage } from '../
 import { fetchFixtures, fetchBootstrap } from '../services/fpl';
 import { fetchUpcomingMatches } from '../services/football-data';
 import { identifyFixture } from '../services/fixture-matcher';
-import { runPLModel, runStandardModel, formatModelBlock, type SimResult } from '../models';
+import { runPLModel, runStandardModel, formatModelBlock, type SimResult, type ModelResult } from '../models';
 import { queryRelevantAnalyses, storeAnalysis } from '../services/vectorStore';
 
 /**
@@ -99,16 +99,19 @@ export async function handleChat(
   // Step 6: Run statistical model and assemble prompt
   let modelBlock: string | null = null;
   let simResult: SimResult | null = null;
+  let adjustmentNotes: string[] = [];
   if (matchContext) {
     try {
+      let modelResult: ModelResult | null = null;
       if (matchContext.type === 'pl') {
-        simResult = runPLModel(matchContext);
-        modelBlock = formatModelBlock(simResult, matchContext.fixture.homeTeam, matchContext.fixture.awayTeam);
+        modelResult = runPLModel(matchContext);
       } else {
-        simResult = runStandardModel(matchContext);
-        if (simResult) {
-          modelBlock = formatModelBlock(simResult, matchContext.fixture.homeTeam, matchContext.fixture.awayTeam);
-        }
+        modelResult = runStandardModel(matchContext);
+      }
+      if (modelResult) {
+        simResult = modelResult.simResult;
+        adjustmentNotes = modelResult.adjustmentNotes;
+        modelBlock = formatModelBlock(simResult, matchContext.fixture.homeTeam, matchContext.fixture.awayTeam);
       }
     } catch (err) {
       console.warn('Statistical model failed, continuing without it:', err);
@@ -219,6 +222,8 @@ export async function handleChat(
       fixtureFound: !!matchContext,
       dataSource: matchContext ? (matchContext.type === 'pl' ? 'fpl' : 'football-data') : null,
       identifiedFixture: fixtureItem ? { id: fixtureItem.id, homeTeam: fixtureItem.homeTeam, awayTeam: fixtureItem.awayTeam, kickoffTime: fixtureItem.kickoffTime, competition: fixtureItem.competition, competitionCode: resolvedCompetitionCode } : null,
+      simResult: simResult ?? undefined,
+      adjustmentNotes: adjustmentNotes.length > 0 ? adjustmentNotes : undefined,
     };
     const streamBody = await runAnalysisStreaming(env, SYSTEM_PROMPT, userPrompt, extraDone, runPostProcessing);
     return new Response(streamBody, {

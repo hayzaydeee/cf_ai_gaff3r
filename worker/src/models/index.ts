@@ -11,10 +11,18 @@ import type { SimResult } from './monteCarlo';
 export type { SimResult };
 
 /**
- * Run the full statistical model for a PL match.
- * Returns a SimResult or null if estimation is not possible.
+ * Bundles a SimResult with the contextual adjustment notes that produced it.
+ * The notes are forwarded to the frontend for display as analysis pills.
  */
-export function runPLModel(context: PLMatchContext): SimResult {
+export interface ModelResult {
+  simResult: SimResult;
+  adjustmentNotes: string[];
+}
+
+/**
+ * Run the full statistical model for a PL match.
+ */
+export function runPLModel(context: PLMatchContext): ModelResult {
   const baseLambdas = estimateLambdasFromFPL(context.homeTeam, context.awayTeam);
 
   const factors = computePLAdjustments(
@@ -25,19 +33,19 @@ export function runPLModel(context: PLMatchContext): SimResult {
   );
 
   const adjustedLambdas = applyAdjustments(baseLambdas, factors);
-  return simulate(adjustedLambdas);
+  return { simResult: simulate(adjustedLambdas), adjustmentNotes: factors.notes };
 }
 
 /**
  * Run the statistical model for a non-PL match using goals/played ratios.
  */
-export function runStandardModel(context: StandardMatchContext): SimResult | null {
+export function runStandardModel(context: StandardMatchContext): ModelResult | null {
   const { homeTeam, awayTeam } = context;
   if (homeTeam.played < 3 || awayTeam.played < 3) {
     return null; // not enough data for a meaningful estimate
   }
   const lambdas = estimateLambdasFromLeagueStats(homeTeam, awayTeam);
-  return simulate(lambdas);
+  return { simResult: simulate(lambdas), adjustmentNotes: [] };
 }
 
 /**

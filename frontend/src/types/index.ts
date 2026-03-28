@@ -1,6 +1,17 @@
 // Shared frontend types
 // Re-exports from worker types where applicable
 
+export interface SimResult {
+  lambda: number;
+  mu: number;
+  homeWinPct: number;
+  drawPct: number;
+  awayWinPct: number;
+  topScorelinesWithPct: { home: number; away: number; probability: number }[];
+  mostLikelyScore: { home: number; away: number; probability: number };
+  confidence: 'low' | 'medium' | 'high';
+}
+
 export interface Fixture {
   id: number;
   homeTeam: string;
@@ -24,6 +35,8 @@ export interface ChatMessage {
   timestamp: string;
   streaming?: boolean;
   prediction?: PredictionSummary | null;
+  simResult?: SimResult;
+  adjustmentNotes?: string[];
   metadata?: {
     fixtureId?: number;
     predictionId?: string;

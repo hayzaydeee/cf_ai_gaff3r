@@ -7,7 +7,7 @@ import type { Confidence } from '../types/app';
 
 const PRIMARY_MODEL = '@cf/meta/llama-3.3-70b-instruct-fp8-fast';
 const FALLBACK_MODEL = '@cf/meta/llama-3.1-8b-instruct';
-const EMBED_MODEL = '@cf/baai/bge-small-en-v1.5';
+const EMBED_MODEL = '@cf/baai/bge-base-en-v1.5';
 const GATEWAY_ID = 'gaff3r-gateway';
 
 export interface PredictionData {

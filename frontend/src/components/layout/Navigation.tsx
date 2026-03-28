@@ -46,6 +46,14 @@ function TrendingUpIcon() {
     );
 }
 
+function BeakerIcon() {
+    return (
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M9 3h6M9 3v7l-5 9a1 1 0 0 0 .9 1.5h14.2A1 1 0 0 0 20 19l-5-9V3" />
+        </svg>
+    );
+}
+
 function SunIcon() {
     return (
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -71,10 +79,11 @@ function MoonIcon() {
 }
 
 const NAV_ITEMS = [
-    { path: '/', label: 'Hub', icon: DashboardIcon },
-    { path: '/chat', label: 'Chat', icon: MessageIcon },
-    { path: '/predictions', label: 'Predictions', icon: ZapIcon },
-    { path: '/stats', label: 'Stats', icon: TrendingUpIcon },
+    { path: '/', label: 'Hub', icon: DashboardIcon, soon: false },
+    { path: '/chat', label: 'Chat', icon: MessageIcon, soon: false },
+    { path: '/predictions', label: 'Predictions', icon: ZapIcon, soon: false },
+    { path: '/stats', label: 'Stats', icon: TrendingUpIcon, soon: false },
+    { path: '/studio', label: 'Studio', icon: BeakerIcon, soon: true },
 ];
 
 function UserIcon() {
@@ -104,6 +113,7 @@ export default function Navigation() {
                     >
                         <item.icon />
                         <span className="nav-tab-label">{item.label}</span>
+                        {item.soon && <span className="nav-soon-dot" />}
                     </NavLink>
                 ))}
                 <button
@@ -131,6 +141,7 @@ export default function Navigation() {
                         >
                             <item.icon />
                             <span>{item.label}</span>
+                            {item.soon && <span className="nav-soon-badge">Soon</span>}
                         </NavLink>
                     ))}
                 </div>
@@ -171,6 +182,7 @@ export default function Navigation() {
                         >
                             <item.icon />
                             <span>{item.label}</span>
+                            {item.soon && <span className="nav-soon-badge nav-soon-badge--sidebar">Soon</span>}
                         </NavLink>
                     ))}
                 </div>
@@ -216,6 +228,7 @@ export default function Navigation() {
           align-items: center;
           gap: 2px;
           padding: 8px 4px;
+          position: relative;
           color: var(--color-char-muted);
           text-decoration: none;
           font-family: var(--font-display);
@@ -393,6 +406,40 @@ export default function Navigation() {
         @media (min-width: 1200px) {
           .nav-tablet { display: none; }
           .nav-desktop { display: flex; }
+        }
+
+        /* ── Coming Soon badge ── */
+        .nav-soon-badge {
+          font-family: var(--font-display);
+          font-size: 9px;
+          font-weight: 700;
+          text-transform: uppercase;
+          letter-spacing: 0.5px;
+          color: var(--color-orange);
+          border: 1px solid var(--color-orange);
+          border-radius: var(--radius-pill);
+          padding: 1px 5px;
+          margin-left: auto;
+          opacity: 0.85;
+        }
+        .nav-soon-badge--sidebar {
+          color: inherit;
+          border-color: currentColor;
+          opacity: 0.5;
+        }
+        .nav-sidebar-link-active .nav-soon-badge--sidebar {
+          color: #fff;
+          border-color: rgba(255,255,255,0.6);
+          opacity: 0.8;
+        }
+        .nav-soon-dot {
+          width: 6px;
+          height: 6px;
+          border-radius: 50%;
+          background: var(--color-orange);
+          position: absolute;
+          top: 6px;
+          right: 8px;
         }
 
         /* ── Auth controls ── */

@@ -4,6 +4,7 @@
 import { betterAuth } from 'better-auth';
 import { magicLink } from 'better-auth/plugins';
 import { D1Dialect } from 'kysely-d1';
+import sgMail from '@sendgrid/mail';
 import type { Env } from './types/env';
 
 /**
@@ -24,7 +25,7 @@ export function getAuth(env: Env) {
     plugins: [
       magicLink({
         sendMagicLink: async ({ email, url }) => {
-          await sendMagicLinkEmail(email, url, env.RESEND_API_KEY);
+          await sendMagicLinkEmail(email, url, env.SENDGRID_API_KEY);
         },
       }),
     ],
@@ -52,32 +53,26 @@ export function getAuth(env: Env) {
 }
 
 /**
- * Send a magic link email via Resend.
- * Uses the REST API directly — no SDK needed.
+ * Send a magic link email via SendGrid.
+ * setApiKey is called per-request — env bindings are request-scoped in CF Workers.
  */
 async function sendMagicLinkEmail(
   to: string,
   magicLinkUrl: string,
-  resendApiKey: string,
+  sendgridApiKey: string,
 ): Promise<void> {
-  const res = await fetch('https://api.resend.com/emails', {
-    method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${resendApiKey}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      from: 'Gaff3r <noreply@gaff3r.xyz>',
-      to: [to],
-      subject: 'Sign in to Gaff3r',
-      html: magicLinkEmailHtml(magicLinkUrl),
-    }),
+  sgMail.setApiKey(sendgridApiKey);
+  await sgMail.send({
+    to,
+    from: 'Gaff3r <hello@gaff3r.xyz>',
+    subject: 'Sign in to Gaff3r',
+    html: magicLinkEmailHtml(magicLinkUrl),
+  }).then(() => {
+    console.log('Email sent')
+  })
+  .catch((error) => {
+    console.error(error)
   });
-
-  if (!res.ok) {
-    const body = await res.text();
-    throw new Error(`Resend error ${res.status}: ${body}`);
-  }
 }
 
 function magicLinkEmailHtml(url: string): string {

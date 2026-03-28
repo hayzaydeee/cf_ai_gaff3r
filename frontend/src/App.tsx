@@ -6,6 +6,7 @@ import Hub from './pages/Hub';
 import Chat from './pages/Chat';
 import Predictions from './pages/Predictions';
 import Stats from './pages/Stats';
+import Studio from './pages/Studio';
 import AuthPage from './pages/Auth';
 import { useState, useEffect } from 'react';
 
@@ -43,6 +44,7 @@ function App() {
                         <Route path="/chat/:fixtureId" element={<Chat />} />
                         <Route path="/predictions" element={<Predictions />} />
                         <Route path="/stats" element={<Stats />} />
+                        <Route path="/studio" element={<Studio />} />
                         <Route path="/auth" element={<AuthPage />} />
                     </Routes>
                 </PageLayout>
