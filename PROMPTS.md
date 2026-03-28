@@ -135,9 +135,24 @@ Arsenal's strong form and home advantage, combined with the statistical model's 
 AI-generated visuals and expanded prediction types (lineups, subs, etc.)"
 
 
-PROMPT 10 (session 2026-03-28)
+PROMPT 10 
 
 "okay let's fully implement approach 1, scaffold 2, and then mark down both all approaches in more detail within the PRD, highlighting that 3 will be for v2 and v3"
+
+
+PROMPT 11
+
+"this is how the app is shaping up so far. use these as context for banging out the ideation backlog i have currently, particularly taking note of the structure of the llm's responses & chosen visualizations. 
+
+  Ideation backlog
+  1. Premium lineup visual — FotMob/Sofascore-style pitch with players positioned in formation. Needs full squad data (FPL only gives key players). Would require a separate squad roster source or manual data layer.
+  2. Custom AI-generated visuals (Approach 2) — VISUAL_JSON registry is scaffolded. Needs: first registered component types (radar, comparison_bar, form_chart), system prompt additions, worker-side VISUAL_JSON parsing. This is the V2 
+  differentiator.
+  3. Approach 3 intent classifier — Two-pass LLM pipeline for edge cases. Marked V3. Needs baseline misfire rate data from V1 first.
+  4. Substitution predictions — "Who do you think comes on?" as a PREDICT:subs sub-type. Needs injury + minutes data which FPL partially provides.
+  5. Player-level predictions — "Will Salah score and assist?" as a combined prop. Would need a PlayerProp component and JSON schema.
+
+then added to that, i think there's still room & gaps for better, more premium design accross these screens & flows"
 
 ---
 
