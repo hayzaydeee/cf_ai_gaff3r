@@ -11,7 +11,12 @@ import type { Env } from './types/env';
  * Call once per request; do not cache across requests.
  */
 export function getAuth(env: Env) {
+  const hasGoogle = !!(env.GOOGLE_CLIENT_ID && env.GOOGLE_CLIENT_SECRET);
+
   return betterAuth({
+    // Better Auth needs to know its own URL to build callback/redirect URIs.
+    // Set BETTER_AUTH_URL in .dev.vars for local dev; in production it's set as a secret.
+    baseURL: env.BETTER_AUTH_URL ?? 'http://localhost:8787',
     database: {
       dialect: new D1Dialect({ database: env.DB }),
       type: 'sqlite',
@@ -22,25 +27,25 @@ export function getAuth(env: Env) {
           await sendMagicLinkEmail(email, url, env.RESEND_API_KEY);
         },
       }),
-      dash()
     ],
-    socialProviders: {
-      google: {
-        clientId: env.GOOGLE_CLIENT_ID,
-        clientSecret: env.GOOGLE_CLIENT_SECRET,
+    ...(hasGoogle && {
+      socialProviders: {
+        google: {
+          clientId: env.GOOGLE_CLIENT_ID,
+          clientSecret: env.GOOGLE_CLIENT_SECRET,
+        },
       },
-    },
+    }),
     trustedOrigins: [
       'https://gaff3r.xyz',
       'https://www.gaff3r.xyz',
       'https://cf-ai-gaff3r.pages.dev',
       'http://localhost:5173',
     ],
-    // Session cookie is HttpOnly + SameSite=Lax + Secure (set automatically by Better Auth)
     session: {
       cookieCache: {
         enabled: true,
-        maxAge: 60 * 60 * 24 * 30, // 30 days
+        maxAge: 60 * 60 * 24 * 30,
       },
     },
   });

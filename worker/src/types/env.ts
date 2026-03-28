@@ -23,6 +23,7 @@ export interface Env {
   // Secrets — set via wrangler secret put or .dev.vars locally
   FOOTBALL_DATA_API_KEY: string;
   BETTER_AUTH_SECRET: string;
+  BETTER_AUTH_URL?: string;
   GOOGLE_CLIENT_ID: string;
   GOOGLE_CLIENT_SECRET: string;
   RESEND_API_KEY: string;
