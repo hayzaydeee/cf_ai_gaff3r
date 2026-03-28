@@ -6,7 +6,7 @@ import { useState } from 'react';
 import { NavLink } from 'react-router-dom';
 import { useTheme } from '../../hooks/useTheme';
 import { useAuth } from '../../context/AuthContext';
-import AuthModal from '../common/AuthModal';
+import AuthModal from '../auth/AuthModal';
 
 // ── Lucide-style SVG icons ──
 
@@ -79,7 +79,7 @@ function MoonIcon() {
 }
 
 const NAV_ITEMS = [
-    { path: '/', label: 'Hub', icon: DashboardIcon, soon: false },
+    { path: '/hub', label: 'Hub', icon: DashboardIcon, soon: false },
     { path: '/chat', label: 'Chat', icon: MessageIcon, soon: false },
     { path: '/predictions', label: 'Predictions', icon: ZapIcon, soon: false },
     { path: '/stats', label: 'Stats', icon: TrendingUpIcon, soon: false },
@@ -108,7 +108,7 @@ export default function Navigation() {
                     <NavLink
                         key={item.path}
                         to={item.path}
-                        end={item.path === '/'}
+                        end={item.path === '/hub'}
                         className={({ isActive }) => `nav-tab ${isActive ? 'nav-tab-active' : ''}`}
                     >
                         <item.icon />
@@ -136,7 +136,7 @@ export default function Navigation() {
                         <NavLink
                             key={item.path}
                             to={item.path}
-                            end={item.path === '/'}
+                            end={item.path === '/hub'}
                             className={({ isActive }) => `nav-link ${isActive ? 'nav-link-active' : ''}`}
                         >
                             <item.icon />
@@ -175,7 +175,7 @@ export default function Navigation() {
                         <NavLink
                             key={item.path}
                             to={item.path}
-                            end={item.path === '/'}
+                            end={item.path === '/hub'}
                             className={({ isActive }) =>
                                 `nav-sidebar-link ${isActive ? 'nav-sidebar-link-active' : ''}`
                             }

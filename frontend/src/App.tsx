@@ -1,54 +1,45 @@
-import { Routes, Route } from 'react-router-dom';
+import { Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import PageLayout from './components/layout/PageLayout';
-import MigrationPrompt from './components/common/MigrationPrompt';
+import Landing from './pages/Landing';
 import Hub from './pages/Hub';
 import Chat from './pages/Chat';
 import Predictions from './pages/Predictions';
 import Stats from './pages/Stats';
 import Studio from './pages/Studio';
 import AuthPage from './pages/Auth';
-import { useState, useEffect } from 'react';
 
-const ANON_ID_KEY = 'gaff3r-user-id';
-
-// Shows MigrationPrompt once after a user first signs in if anonymous data exists
-function MigrationGate({ children }: { children: React.ReactNode }) {
+function RequireAuth({ children }: { children: React.ReactNode }) {
     const { isAuthenticated, isLoading } = useAuth();
-    const [showMigration, setShowMigration] = useState(false);
-
-    useEffect(() => {
-        if (!isLoading && isAuthenticated && localStorage.getItem(ANON_ID_KEY)) {
-            setShowMigration(true);
-        }
-    }, [isAuthenticated, isLoading]);
-
-    return (
-        <>
-            {children}
-            {showMigration && (
-                <MigrationPrompt onDone={() => setShowMigration(false)} />
-            )}
-        </>
-    );
+    if (isLoading) return null;
+    if (!isAuthenticated) return <Navigate to="/" replace />;
+    return <>{children}</>;
 }
 
 function App() {
     return (
         <AuthProvider>
-            <MigrationGate>
-                <PageLayout>
-                    <Routes>
-                        <Route path="/" element={<Hub />} />
-                        <Route path="/chat" element={<Chat />} />
-                        <Route path="/chat/:fixtureId" element={<Chat />} />
-                        <Route path="/predictions" element={<Predictions />} />
-                        <Route path="/stats" element={<Stats />} />
-                        <Route path="/studio" element={<Studio />} />
-                        <Route path="/auth" element={<AuthPage />} />
-                    </Routes>
-                </PageLayout>
-            </MigrationGate>
+            <Routes>
+                {/* Public landing — no app shell */}
+                <Route path="/" element={<Landing />} />
+
+                {/* Protected app shell — redirects unauthenticated users to landing */}
+                <Route path="/*" element={
+                    <RequireAuth>
+                        <PageLayout>
+                            <Routes>
+                                <Route path="/hub" element={<Hub />} />
+                                <Route path="/chat" element={<Chat />} />
+                                <Route path="/chat/:fixtureId" element={<Chat />} />
+                                <Route path="/predictions" element={<Predictions />} />
+                                <Route path="/stats" element={<Stats />} />
+                                <Route path="/studio" element={<Studio />} />
+                                <Route path="/auth" element={<AuthPage />} />
+                            </Routes>
+                        </PageLayout>
+                    </RequireAuth>
+                } />
+            </Routes>
         </AuthProvider>
     );
 }

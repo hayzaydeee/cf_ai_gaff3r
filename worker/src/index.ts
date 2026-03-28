@@ -6,7 +6,6 @@ import { handleGetMatchContext } from './routes/match-context';
 import { handleChat } from './routes/chat';
 import { handleGetPredictions } from './routes/predictions';
 import { handleGetStats, handleResolve } from './routes/stats';
-import { handleMigrateAnonymous } from './routes/migrate';
 import { getAuth, getSessionUserId } from './auth';
 import { runFplSnapshot } from './cron/fplSnapshot';
 import { runResolvePredictions } from './cron/resolvePredictions';
@@ -128,27 +127,13 @@ export default {
         return secured(response, origin);
       }
 
-      // ── Authenticated routes — dual-identity resolution ──
-      // Prefer a Better Auth session cookie; fall back to anonymous x-user-id header.
+      // ── Authenticated routes ──
 
-      let userId: string | null = null;
-      let isAuthenticated = false;
-
-      // 1. Try session cookie (authenticated user)
-      const sessionUserId = await getSessionUserId(request, env);
-      if (sessionUserId) {
-        userId = sessionUserId;
-        isAuthenticated = true;
-      } else {
-        // 2. Fall back to anonymous x-user-id header
-        const anonId = request.headers.get('x-user-id');
-        if (anonId && USER_ID_REGEX.test(anonId)) {
-          userId = anonId;
-        }
-      }
+      const userId = await getSessionUserId(request, env);
+      const isAuthenticated = !!userId;
 
       if (!userId) {
-        return secured(errorResponse('Unauthorised — sign in or provide x-user-id header', 401), origin);
+        return secured(errorResponse('Unauthorised — sign in required', 401), origin);
       }
 
       // GET /api/chat/:gw — load stored chat history
@@ -237,15 +222,6 @@ export default {
         return secured(response, origin);
       }
 
-      // POST /api/migrate-anonymous — copy anonymous DO data to authenticated account
-      if (path === '/api/migrate-anonymous' && request.method === 'POST') {
-        if (!isAuthenticated) {
-          return secured(errorResponse('Must be signed in to migrate data', 403), origin);
-        }
-        response = await handleMigrateAnonymous(request, userId, env);
-        return secured(response, origin);
-      }
-
       // 404
       return secured(errorResponse('Not Found', 404), origin);
 
@@ -268,7 +244,7 @@ function corsHeaders(origin: string): Record<string, string> {
   return {
     'Access-Control-Allow-Origin': allowedOrigin,
     'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-    'Access-Control-Allow-Headers': 'Content-Type, x-user-id',
+    'Access-Control-Allow-Headers': 'Content-Type',
     'Access-Control-Allow-Credentials': 'true',  // required for session cookies
     'Access-Control-Max-Age': '86400',
     'Vary': 'Origin',

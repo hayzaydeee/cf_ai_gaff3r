@@ -39,7 +39,8 @@ export class UserState {
           return json({ ok: true });
         }
         if (path.startsWith('/chat/')) {
-          const gw = parseInt(path.split('/')[2]);
+          const parts = path.split('/');
+          const gw = parseInt(parts[2]);
           const msg = body as unknown as ChatMessage;
           await this.addChatMessage(gw, msg);
           return json({ ok: true });

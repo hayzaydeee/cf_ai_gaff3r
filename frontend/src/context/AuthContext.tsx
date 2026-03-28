@@ -2,6 +2,7 @@
 // Provides session state, sign-in helpers, and sign-out to all children
 
 import { createContext, useContext, useState, useCallback, type ReactNode } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { authClient, type AuthUser } from '../lib/auth-client';
 
 interface AuthContextValue {
@@ -18,11 +19,12 @@ const AuthContext = createContext<AuthContextValue | null>(null);
 export function AuthProvider({ children }: { children: ReactNode }) {
   const { data: session, isPending } = authClient.useSession();
   const [isSocialLoading, setIsSocialLoading] = useState(false);
+  const navigate = useNavigate();
 
   const signInWithMagicLink = useCallback(async (email: string) => {
     const result = await authClient.signIn.magicLink({
       email,
-      callbackURL: '/',
+      callbackURL: window.location.origin + '/hub',
     });
     if (result.error) {
       return { success: false, error: result.error.message ?? 'Failed to send magic link' };
@@ -35,7 +37,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       await authClient.signIn.social({
         provider: 'google',
-        callbackURL: '/',
+        callbackURL: window.location.origin + '/hub',
       });
     } finally {
       setIsSocialLoading(false);
@@ -44,7 +46,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const signOut = useCallback(async () => {
     await authClient.signOut();
-  }, []);
+    navigate('/', { replace: true });
+  }, [navigate]);
 
   return (
     <AuthContext.Provider

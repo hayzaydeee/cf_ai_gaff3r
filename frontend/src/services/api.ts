@@ -1,20 +1,9 @@
 // Frontend API client
-// Handles userId generation, auth headers, and typed fetch wrappers
+// Typed fetch wrappers — auth via session cookie (credentials: 'include')
 
 import type { Fixture, Prediction, PredictionSummary, ChatMessage, SimResult, TypedPrediction } from '../types';
 
 const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8787';
-
-// ── User ID ──
-
-function getUserId(): string {
-  let id = localStorage.getItem('gaff3r-user-id');
-  if (!id) {
-    id = `usr_${crypto.randomUUID()}`;
-    localStorage.setItem('gaff3r-user-id', id);
-  }
-  return id;
-}
 
 // ── Base fetcher ──
 
@@ -22,7 +11,6 @@ async function fetchAPI<T>(path: string, options: RequestInit = {}): Promise<T> 
   const url = `${API_BASE}${path}`;
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
-    'x-user-id': getUserId(),
     ...(options.headers as Record<string, string> ?? {}),
   };
 
@@ -182,7 +170,7 @@ export function getUpcomingFixtures(): Promise<{ fixtures: FixtureData[] }> {
 export function sendChat(message: string, gameweek: number, fixtureId?: number): Promise<ChatResponseData> {
   return fetchAPI<ChatResponseData>('/api/chat', {
     method: 'POST',
-    body: JSON.stringify({ message, gameweek, fixtureId, userId: getUserId() }),
+    body: JSON.stringify({ message, gameweek, fixtureId }),
   });
 }
 
@@ -205,9 +193,8 @@ export async function* sendChatStream(
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      'x-user-id': getUserId(),
     },
-    body: JSON.stringify({ message, gameweek, fixtureId, userId: getUserId(), stream: true }),
+    body: JSON.stringify({ message, gameweek, fixtureId, stream: true }),
     credentials: 'include',
   });
 
