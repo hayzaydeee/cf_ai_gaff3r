@@ -2,6 +2,7 @@ name = "gaff3r-worker"
 main = "src/index.ts"
 compatibility_date = "2024-12-01"
 compatibility_flags = ["nodejs_compat"]
+routes = [{ pattern = "api.gaff3r.xyz", zone_name = "gaff3r.xyz", custom_domain = true }]
 
 [durable_objects]
 bindings = [{ name = "USER_STATE", class_name = "UserState" }]

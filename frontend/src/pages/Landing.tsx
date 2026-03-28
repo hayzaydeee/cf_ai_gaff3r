@@ -1,10 +1,128 @@
 // Landing page — public marketing page at /
 // Authenticated users are redirected to /hub
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { motion } from 'framer-motion';
 import { useAuth } from '../context/AuthContext';
 import AuthModal from '../components/auth/AuthModal';
+
+// ── Animation variants ─────────────────────────────────────────────────────
+
+const fadeUp = {
+  hidden: { opacity: 0, y: 28 },
+  visible: { opacity: 1, y: 0, transition: { duration: 0.55, ease: 'easeOut' as const } },
+};
+
+const stagger = {
+  hidden: {},
+  visible: { transition: { staggerChildren: 0.1 } },
+};
+
+const chatStagger = {
+  hidden: {},
+  visible: { transition: { staggerChildren: 0.45, delayChildren: 0.1 } },
+};
+
+// ── Count-up stat ──────────────────────────────────────────────────────────
+
+function StatCounter({ target, duration = 1400 }: { target: number; duration?: number }) {
+  const ref = useRef<HTMLSpanElement>(null);
+  const [value, setValue] = useState(0);
+
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const obs = new IntersectionObserver(
+      ([entry]) => {
+        if (!entry.isIntersecting) return;
+        obs.disconnect();
+        const start = performance.now();
+        function step(now: number) {
+          const t = Math.min((now - start) / duration, 1);
+          const eased = 1 - Math.pow(1 - t, 3);
+          setValue(Math.round(eased * target));
+          if (t < 1) requestAnimationFrame(step);
+        }
+        requestAnimationFrame(step);
+      },
+      { threshold: 0.5 }
+    );
+    obs.observe(el);
+    return () => obs.disconnect();
+  }, [target, duration]);
+
+  return <span ref={ref}>{value.toLocaleString()}</span>;
+}
+
+// ── Snapshot components ────────────────────────────────────────────────────
+
+function MockOutcomeBar({ home, draw, away }: { home: number; draw: number; away: number }) {
+  return (
+    <div className="mob-root">
+      <div className="mob-labels">
+        <span className="mob-label">Home <strong>{home}%</strong></span>
+        <span className="mob-label mob-center">Draw <strong>{draw}%</strong></span>
+        <span className="mob-label mob-right">Away <strong>{away}%</strong></span>
+      </div>
+      <div className="mob-bar">
+        <div className="mob-seg mob-home" style={{ width: `${home}%` }} />
+        <div className="mob-seg mob-draw" style={{ width: `${draw}%` }} />
+        <div className="mob-seg mob-away" style={{ width: `${away}%` }} />
+      </div>
+    </div>
+  );
+}
+
+function MockPredictionCard({
+  home, away, homeScore, awayScore, confidence, reasoning,
+}: {
+  home: string; away: string; homeScore: number; awayScore: number;
+  confidence: 'low' | 'medium' | 'high'; reasoning: string;
+}) {
+  return (
+    <div className="mpc-root">
+      <div className="mpc-header">
+        <span className="mpc-label">Gaff3r's Pick</span>
+        <span className={`mpc-conf mpc-conf-${confidence}`}>{confidence}</span>
+      </div>
+      <div className="mpc-score">
+        <span className="mpc-team">{home}</span>
+        <span className="mpc-line">{homeScore} – {awayScore}</span>
+        <span className="mpc-team">{away}</span>
+      </div>
+      <p className="mpc-reasoning">{reasoning}</p>
+    </div>
+  );
+}
+
+function MockSectionCard({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div className="msc-root">
+      <div className="msc-label">{label}</div>
+      <div className="msc-body">{children}</div>
+    </div>
+  );
+}
+
+function MockUserBubble({ children }: { children: React.ReactNode }) {
+  return (
+    <motion.div className="mub-root" variants={fadeUp}>
+      <div className="mub-bubble">{children}</div>
+    </motion.div>
+  );
+}
+
+function MockAssistantBubble({ children }: { children: React.ReactNode }) {
+  return (
+    <motion.div className="mab-root" variants={fadeUp}>
+      <div className="mab-sigil">⚽</div>
+      <div className="mab-content">{children}</div>
+    </motion.div>
+  );
+}
+
+// ── Logo ───────────────────────────────────────────────────────────────────
 
 function GaffLogo({ size = 20 }: { size?: number }) {
   return (
@@ -17,266 +135,341 @@ function GaffLogo({ size = 20 }: { size?: number }) {
   );
 }
 
+// ── Main component ─────────────────────────────────────────────────────────
+
 export default function Landing() {
   const { isAuthenticated, isLoading } = useAuth();
   const navigate = useNavigate();
   const [authOpen, setAuthOpen] = useState(false);
 
-  // Redirect authenticated users straight to the app
   useEffect(() => {
-    if (!isLoading && isAuthenticated) {
-      navigate('/hub', { replace: true });
-    }
+    if (!isLoading && isAuthenticated) navigate('/hub', { replace: true });
   }, [isAuthenticated, isLoading, navigate]);
 
-  function openAuth() { setAuthOpen(true); }
-  function closeAuth() { setAuthOpen(false); }
-  function onAuthSuccess() { navigate('/hub'); }
+  const openAuth = () => setAuthOpen(true);
 
   return (
     <div className="ld-root">
-      {/* ── Top nav ── */}
+
+      {/* ── Nav ── */}
       <header className="ld-nav">
         <div className="ld-nav-inner">
           <a href="/" className="ld-brand" aria-label="gaff3r home">
-            <GaffLogo size={22} />
-            <span className="ld-brand-text">gaff<span className="ld-brand-3">3</span>r</span>
+            <GaffLogo size={20} />
+            <span className="ld-brand-text">gaff<span className="ld-o">3</span>r</span>
           </a>
-          <button className="ld-signin-btn" onClick={openAuth}>Sign in</button>
+          <button className="ld-nav-btn" onClick={openAuth}>Sign in</button>
         </div>
       </header>
 
-      <main className="ld-main">
+      <main>
+
         {/* ── Hero ── */}
-        <section className="ld-hero">
-          <h1 className="ld-hero-title">
-            Football predictions backed<br className="ld-br" /> by real statistical models
-          </h1>
-          <p className="ld-hero-sub">
-            Not LLM guesswork. Dixon-Coles estimates team strengths from historical data.
-            Monte Carlo runs 15,000 simulations. The AI explains what the numbers mean.
-          </p>
-          <div className="ld-hero-ctas">
-            <button className="ld-cta-primary" onClick={openAuth}>Ask the gaffer</button>
-            <a
-              href="https://github.com/adamb/cf_ai_gaff3r"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="ld-cta-secondary"
+        <section className="ld-hero-section">
+          <div className="ld-hero-inner">
+            <motion.div
+              className="ld-hero-copy"
+              variants={stagger}
+              initial="hidden"
+              animate="visible"
             >
-              View on GitHub
-            </a>
+              <motion.h1 className="ld-hero-title" variants={fadeUp}>
+                Football predictions,<br />backed by real maths.
+              </motion.h1>
+              <motion.p className="ld-hero-sub" variants={fadeUp}>
+                Ask the gaffer about any Premier League fixture. Get win probabilities,
+                predicted scorelines, and tactical breakdowns — powered by Dixon-Coles
+                and 15,000 Monte Carlo simulations per match.
+              </motion.p>
+              <motion.div className="ld-hero-ctas" variants={fadeUp}>
+                <button className="ld-btn-primary" onClick={openAuth}>Ask the gaffer →</button>
+                <a
+                  href="https://github.com/adamb/cf_ai_gaff3r"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="ld-btn-secondary"
+                >
+                  View on GitHub
+                </a>
+              </motion.div>
+            </motion.div>
+
+            <div className="ld-hero-mock-wrap">
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.7, delay: 0.35, ease: 'easeOut' }}
+              >
+                <motion.div
+                  className="ld-hero-mock"
+                  animate={{ y: [0, -8, 0] }}
+                  transition={{ repeat: Infinity, duration: 5, ease: 'easeInOut' }}
+                >
+                  <div className="ld-mock-chrome">
+                    <span className="ld-chrome-dot" />
+                    <span className="ld-chrome-dot" />
+                    <span className="ld-chrome-dot" />
+                    <span className="ld-chrome-title">gaff<span className="ld-o">3</span>r</span>
+                  </div>
+                  <div className="ld-mock-body">
+                    <div className="mub-root">
+                      <div className="mub-bubble">Who do you fancy for Arsenal vs Chelsea?</div>
+                    </div>
+                    <div className="ld-mock-ai-row">
+                      <div className="ld-mock-sigil">⚽</div>
+                      <div className="ld-mock-ai-content">
+                        <MockSectionCard label="The Model's View">
+                          Dixon-Coles gives Arsenal the edge — <strong>42% home / 28% draw / 30% away</strong> across 15,000 simulations.
+                        </MockSectionCard>
+                        <MockOutcomeBar home={42} draw={28} away={30} />
+                        <MockPredictionCard
+                          home="Arsenal" away="Chelsea"
+                          homeScore={2} awayScore={1}
+                          confidence="medium"
+                          reasoning="Arsenal's press should create enough second-ball situations to pull clear."
+                        />
+                      </div>
+                    </div>
+                  </div>
+                </motion.div>
+              </motion.div>
+            </div>
           </div>
         </section>
 
-        {/* ── Stats bar ── */}
-        <div className="ld-stats">
-          <div className="ld-stat">
-            <span className="ld-stat-val">15,000</span>
-            <span className="ld-stat-label">Simulations per prediction</span>
-          </div>
-          <div className="ld-stat">
-            <span className="ld-stat-val">50ms</span>
-            <span className="ld-stat-label">Model computation time</span>
-          </div>
-          <div className="ld-stat">
-            <span className="ld-stat-val">38</span>
-            <span className="ld-stat-label">Gameweeks of logged data</span>
-          </div>
-        </div>
-
-        {/* ── Chat mockup ── */}
-        <div className="ld-mock">
-          <div className="ld-mock-header">
-            <div className="ld-mock-brand">
-              <GaffLogo size={14} />
-              <span className="ld-mock-brand-text">gaff<span className="ld-brand-3">3</span>r</span>
+        {/* ── Stats strip ── */}
+        <motion.section
+          className="ld-stats-section"
+          variants={fadeUp}
+          initial="hidden"
+          whileInView="visible"
+          viewport={{ once: true }}
+        >
+          <div className="ld-stats-inner">
+            <div className="ld-stat">
+              <span className="ld-stat-val"><StatCounter target={15000} /></span>
+              <span className="ld-stat-label">simulations per fixture</span>
             </div>
-            <span className="ld-mock-accuracy">accuracy: 54%</span>
-          </div>
-
-          <div className="ld-mock-user">
-            <p>What about Arsenal vs Chelsea this weekend?</p>
-          </div>
-
-          <div className="ld-mock-ai">
-            <p className="ld-mock-ai-text">
-              Arsenal at home against Chelsea? I fancy the Gunners here. Saka's in brilliant form
-              (7.3 FPL form, 0.45 xG/90) and Chelsea's away defence has been leaking. The model agrees…
-            </p>
-            <div className="ld-pred-card">
-              <div className="ld-pred-teams">
-                <span className="ld-pred-team">Arsenal</span>
-                <span className="ld-pred-score">2 – 1</span>
-                <span className="ld-pred-team">Chelsea</span>
-              </div>
-              <div className="ld-pred-probs">
-                <span>Home 58%</span>
-                <span>Draw 22%</span>
-                <span>Away 20%</span>
-              </div>
-              <div className="ld-pred-bar">
-                <div style={{ width: '58%' }} className="ld-pred-bar-home" />
-                <div style={{ width: '22%' }} className="ld-pred-bar-draw" />
-                <div style={{ width: '20%' }} className="ld-pred-bar-away" />
-              </div>
+            <div className="ld-stat-divider" />
+            <div className="ld-stat">
+              <span className="ld-stat-val"><StatCounter target={38} duration={900} /></span>
+              <span className="ld-stat-label">gameweeks tracked</span>
             </div>
-            <p className="ld-mock-caveat">
-              Where I could be wrong: Chelsea's counter has been lethal away this month, and the
-              model doesn't fully weight that tactical dimension.
-            </p>
+            <div className="ld-stat-divider" />
+            <div className="ld-stat">
+              <span className="ld-stat-val">&lt;50ms</span>
+              <span className="ld-stat-label">median streamed response</span>
+            </div>
           </div>
+        </motion.section>
 
-          <div className="ld-mock-chips">
-            {['Man City vs Liverpool', 'Spurs vs Man Utd', 'Barca vs Real Madrid'].map(f => (
-              <button key={f} className="ld-mock-chip" onClick={openAuth}>{f}</button>
-            ))}
-          </div>
-        </div>
+        {/* ── Chat demo ── */}
+        <section className="ld-demo-section">
+          <motion.div
+            className="ld-demo-header"
+            variants={fadeUp}
+            initial="hidden"
+            whileInView="visible"
+            viewport={{ once: true }}
+          >
+            <h2 className="ld-section-h2">See it in action</h2>
+            <p className="ld-section-sub">A real conversation with the gaffer</p>
+          </motion.div>
 
-        {/* ── How predictions work ── */}
-        <section className="ld-pipeline">
-          <h2 className="ld-section-title">How predictions work</h2>
-          <div className="ld-steps">
+          <motion.div
+            className="ld-demo-panel"
+            variants={chatStagger}
+            initial="hidden"
+            whileInView="visible"
+            viewport={{ once: true, margin: '-60px' }}
+          >
+            <MockUserBubble>
+              Who do you fancy for Arsenal vs Chelsea this weekend?
+            </MockUserBubble>
+
+            <MockAssistantBubble>
+              <MockSectionCard label="The Model's View">
+                Dixon-Coles gives Arsenal a narrow edge — <strong>42% home / 28% draw / 30% away</strong> across
+                15,000 simulations. Their attack rating is the joint-highest in the division this season.
+              </MockSectionCard>
+              <MockOutcomeBar home={42} draw={28} away={30} />
+              <MockSectionCard label="Key Factors">
+                Arsenal's xG over the last 6 GWs: <strong>2.1</strong>. Chelsea have conceded in 9 of
+                their last 11 away fixtures, and their defensive line sits unusually high — exploitable on the counter.
+              </MockSectionCard>
+              <MockPredictionCard
+                home="Arsenal" away="Chelsea"
+                homeScore={2} awayScore={1}
+                confidence="medium"
+                reasoning="Arsenal's press will create enough second-ball situations to pull away after half-time."
+              />
+            </MockAssistantBubble>
+
+            <MockUserBubble>
+              What about Martinelli — is he starting?
+            </MockUserBubble>
+
+            <MockAssistantBubble>
+              <MockSectionCard label="Team News">
+                FPL ownership and last-GW selection data point to Martinelli in the XI.
+                Havertz is likely rotated — cup fixture midweek means Arteta will manage minutes carefully.
+              </MockSectionCard>
+            </MockAssistantBubble>
+          </motion.div>
+        </section>
+
+        {/* ── Pipeline ── */}
+        <section className="ld-pipeline-section">
+          <motion.div
+            variants={fadeUp}
+            initial="hidden"
+            whileInView="visible"
+            viewport={{ once: true }}
+            className="ld-pipeline-header"
+          >
+            <h2 className="ld-section-h2">How predictions are made</h2>
+            <p className="ld-section-sub">Statistical rigour, not LLM guesswork</p>
+          </motion.div>
+
+          <motion.div
+            className="ld-steps"
+            variants={stagger}
+            initial="hidden"
+            whileInView="visible"
+            viewport={{ once: true }}
+          >
             {[
               {
                 n: '1',
-                title: 'Learn team strengths',
-                body: 'Dixon-Coles MLE estimates attack and defence parameters for every team from historical results. Updated weekly.',
+                title: 'Dixon-Coles MLE',
+                body: 'Attack and defence strengths fitted to the full season using maximum-likelihood estimation. Includes the Dixon-Coles low-scoring correction for 0–0 and 1–0 results.',
               },
               {
                 n: '2',
-                title: 'Compute expected goals',
-                body: 'Your attack vs their defence, adjusted for home advantage, injuries, and form. Real interaction, not vibes.',
+                title: 'xG adjustment',
+                body: 'Recent expected-goals data overlaid as a Bayesian prior, weighted toward the last 6 matches to capture current form without overreacting to noise.',
               },
               {
                 n: '3',
-                title: 'Simulate 15,000 matches',
-                body: 'Monte Carlo draws random goals from probability distributions. Produces real win/draw/loss percentages and scoreline probabilities.',
+                title: 'Monte Carlo simulation',
+                body: '15,000 match outcomes drawn from the fitted Poisson model. Produces a full scoreline probability grid and outcome percentages — not a single point estimate.',
               },
               {
                 n: '4',
-                title: 'The gaffer explains',
-                body: 'Llama 3.3 narrates the model outputs using FPL data: player form, injuries, xG, set pieces. The model computes. The AI explains.',
+                title: 'Claude AI interpretation',
+                body: 'Simulation output, FPL squad data, and fixture context passed to Claude. You get a readable, tactically-aware breakdown — not just numbers on a screen.',
               },
-            ].map((step, i) => (
-              <div key={step.n} className={`ld-step${i === 0 ? ' ld-step-first' : i === 3 ? ' ld-step-last' : ''}`}>
-                <div className="ld-step-num">{step.n}</div>
-                <div>
+            ].map((step) => (
+              <motion.div key={step.n} className="ld-step" variants={fadeUp}>
+                <div className="ld-step-track">
+                  <div className="ld-step-num">{step.n}</div>
+                  <div className="ld-step-line" />
+                </div>
+                <div className="ld-step-content">
                   <p className="ld-step-title">{step.title}</p>
                   <p className="ld-step-body">{step.body}</p>
                 </div>
-              </div>
+              </motion.div>
             ))}
-          </div>
+          </motion.div>
         </section>
 
-        {/* ── Feature cards ── */}
-        <div className="ld-features">
-          {[
-            {
-              icon: (
-                <svg width="20" height="20" viewBox="0 0 20 20" aria-hidden="true">
-                  <rect x="1" y="3" width="5" height="14" rx="1" fill="var(--color-orange)" opacity="0.3" />
-                  <rect x="7.5" y="6" width="5" height="11" rx="1" fill="var(--color-orange)" opacity="0.55" />
-                  <rect x="14" y="1" width="5" height="16" rx="1" fill="var(--color-orange)" />
-                </svg>
-              ),
-              title: 'Accuracy tracking',
-              body: 'Every prediction stored and resolved. See your outcome accuracy, exact score rate, streaks, and confidence calibration.',
-            },
-            {
-              icon: (
-                <svg width="20" height="20" viewBox="0 0 20 20" aria-hidden="true">
-                  <circle cx="10" cy="10" r="8" fill="none" stroke="var(--color-orange)" strokeWidth="1.5" />
-                  <path d="M10 4 L10 10 L14 12" fill="none" stroke="var(--color-orange)" strokeWidth="1.5" strokeLinecap="round" />
-                </svg>
-              ),
-              title: 'Data logged weekly',
-              body: 'FPL player form, injuries, team strength, and fixture results captured every gameweek. A dataset no external API provides.',
-            },
-            {
-              icon: (
-                <svg width="20" height="20" viewBox="0 0 20 20" aria-hidden="true">
-                  <rect x="2" y="2" width="16" height="16" rx="3" fill="none" stroke="var(--color-orange)" strokeWidth="1.5" />
-                  <line x1="2" y1="7" x2="18" y2="7" stroke="var(--color-orange)" strokeWidth="1" opacity="0.4" />
-                  <line x1="7" y1="7" x2="7" y2="18" stroke="var(--color-orange)" strokeWidth="1" opacity="0.4" />
-                </svg>
-              ),
-              title: 'Full league coverage',
-              body: 'Premier League with FPL-enriched data. La Liga, Bundesliga, Serie A, Ligue 1, and Champions League via football-data.org.',
-            },
-          ].map(f => (
-            <div key={f.title} className="ld-feat-card">
-              <div className="ld-feat-icon">{f.icon}</div>
-              <p className="ld-feat-title">{f.title}</p>
-              <p className="ld-feat-body">{f.body}</p>
-            </div>
-          ))}
-        </div>
+        {/* ── Feature grid ── */}
+        <section className="ld-features-section">
+          <motion.div
+            variants={fadeUp}
+            initial="hidden"
+            whileInView="visible"
+            viewport={{ once: true }}
+          >
+            <h2 className="ld-section-h2">Built for the long game</h2>
+            <p className="ld-section-sub">Everything you need to follow a season properly</p>
+          </motion.div>
+
+          <motion.div
+            className="ld-features"
+            variants={stagger}
+            initial="hidden"
+            whileInView="visible"
+            viewport={{ once: true }}
+          >
+            {[
+              {
+                title: 'Prediction tracking',
+                body: 'Every prediction stored and resolved automatically after the match. See your outcome accuracy, exact score rate, streaks, and calibration across the season.',
+              },
+              {
+                title: 'FPL context built in',
+                body: 'Squad selections, captain choices, and ownership data from the FPL API inform every answer. Team news and rotation risk are always current.',
+              },
+              {
+                title: 'Per-fixture conversations',
+                body: 'Each match gets its own chat thread. Come back mid-week for injury updates, or review what the gaffer said before kick-off.',
+              },
+            ].map((f) => (
+              <motion.div key={f.title} className="ld-feat-card" variants={fadeUp}>
+                <p className="ld-feat-title">{f.title}</p>
+                <p className="ld-feat-body">{f.body}</p>
+              </motion.div>
+            ))}
+          </motion.div>
+        </section>
 
         {/* ── Studio teaser ── */}
-        <div className="ld-studio">
+        <motion.section
+          className="ld-studio-section"
+          variants={fadeUp}
+          initial="hidden"
+          whileInView="visible"
+          viewport={{ once: true }}
+        >
           <span className="ld-studio-badge">coming soon</span>
-          <h2 className="ld-studio-title">gaff<span className="ld-brand-3">3</span>r studio</h2>
+          <h2 className="ld-studio-title">gaff<span className="ld-o">3</span>r studio</h2>
           <p className="ld-studio-sub">
-            General-purpose football analysis research. Ask any question across any time window
-            and get real computed data back. Built for content creators, powered by the longitudinal
-            dataset Gaff3r accumulates every week.
+            Text-to-SQL queries over your entire prediction history.
           </p>
-          <div className="ld-studio-grid">
-            {[
-              { title: 'Text-to-SQL queries', sub: '"Best away xG since Christmas?"' },
-              { title: 'Analysis templates', sub: '8 pre-built + custom frameworks' },
-              { title: 'Comparison engine', sub: 'Manager vs manager, era vs era' },
-              { title: 'Exportable data cards', sub: 'Stat graphics for videos and socials' },
-            ].map(s => (
-              <div key={s.title} className="ld-studio-item">
-                <p className="ld-studio-item-title">{s.title}</p>
-                <p className="ld-studio-item-sub">{s.sub}</p>
-              </div>
-            ))}
+          <div className="ld-studio-queries">
+            <p className="ld-studio-query">"Which teams have I over-predicted at home this season?"</p>
+            <p className="ld-studio-query">"Show my accuracy in matches where the home xG exceeded 2.5."</p>
           </div>
-        </div>
-
-        {/* ── Tech strip ── */}
-        <div className="ld-tech">
-          {[
-            { label: 'Stack', value: 'Cloudflare Workers, Pages, D1, Durable Objects' },
-            { label: 'Model', value: 'Dixon-Coles + Monte Carlo + Llama 3.3' },
-            { label: 'Data', value: 'FPL API, football-data.org, Club Elo' },
-            { label: 'Frontend', value: 'React, TypeScript, Vite' },
-          ].map(t => (
-            <div key={t.label} className="ld-tech-item">
-              <span className="ld-tech-label">{t.label}</span>
-              <span className="ld-tech-value">{t.value}</span>
-            </div>
-          ))}
-        </div>
+        </motion.section>
 
         {/* ── Bottom CTA ── */}
-        <section className="ld-cta-section">
-          <h2 className="ld-cta-title">Ask the gaffer</h2>
-          <p className="ld-cta-sub">Real probabilities. Real data. Real opinions.</p>
-          <button className="ld-cta-primary" onClick={openAuth}>Start chatting</button>
-        </section>
+        <motion.section
+          className="ld-cta-section"
+          variants={fadeUp}
+          initial="hidden"
+          whileInView="visible"
+          viewport={{ once: true }}
+        >
+          <h2 className="ld-cta-title">Ready to ask the gaffer?</h2>
+          <p className="ld-cta-sub">Free to use. Sign in to save predictions and track your accuracy.</p>
+          <button className="ld-btn-primary" onClick={openAuth}>Ask the gaffer →</button>
+        </motion.section>
 
         {/* ── Footer ── */}
         <footer className="ld-footer">
-          <span className="ld-footer-brand">gaff<span className="ld-brand-3">3</span>r</span>
+          <span className="ld-footer-brand">gaff<span className="ld-o">3</span>r</span>
+          <span className="ld-footer-sep">·</span>
           <span className="ld-footer-sub">Built on Cloudflare's edge</span>
         </footer>
+
       </main>
 
-      <AuthModal isOpen={authOpen} onClose={closeAuth} onSuccess={onAuthSuccess} />
+      <AuthModal
+        isOpen={authOpen}
+        onClose={() => setAuthOpen(false)}
+        onSuccess={() => navigate('/hub')}
+      />
 
       <style>{`
+        /* ── Root ── */
         .ld-root {
           min-height: 100vh;
           background: var(--color-bg);
           color: var(--color-char);
         }
-        .ld-brand-3 { color: var(--color-orange); }
+        .ld-o { color: var(--color-orange); }
 
         /* ── Nav ── */
         .ld-nav {
@@ -287,9 +480,9 @@ export default function Landing() {
           border-bottom: 1px solid var(--color-border);
         }
         .ld-nav-inner {
-          max-width: 760px;
+          max-width: 1080px;
           margin: 0 auto;
-          padding: 0 24px;
+          padding: 0 32px;
           height: 52px;
           display: flex;
           align-items: center;
@@ -298,7 +491,7 @@ export default function Landing() {
         .ld-brand {
           display: flex;
           align-items: center;
-          gap: 7px;
+          gap: 8px;
           text-decoration: none;
         }
         .ld-brand-text {
@@ -308,57 +501,23 @@ export default function Landing() {
           color: var(--color-char);
           letter-spacing: -0.3px;
         }
-        .ld-signin-btn {
-          padding: 7px 16px;
-          background: var(--color-orange);
-          color: #fff;
-          border: none;
+        .ld-nav-btn {
+          padding: 7px 18px;
+          background: transparent;
+          color: var(--color-char);
+          border: 1px solid var(--color-border);
           border-radius: var(--radius-md);
           font-family: var(--font-display);
           font-size: 13px;
-          font-weight: 600;
+          font-weight: 500;
           cursor: pointer;
           transition: background 0.15s;
         }
-        .ld-signin-btn:hover { background: var(--color-orange-hover); }
+        .ld-nav-btn:hover { background: var(--color-beige); }
 
-        /* ── Main content ── */
-        .ld-main {
-          max-width: 760px;
-          margin: 0 auto;
-          padding: 0 24px 48px;
-        }
-
-        /* ── Hero ── */
-        .ld-hero {
-          padding: 52px 0 40px;
-          text-align: center;
-        }
-        .ld-hero-title {
-          font-family: var(--font-display);
-          font-size: clamp(24px, 4vw, 36px);
-          font-weight: 700;
-          line-height: 1.2;
-          color: var(--color-char);
-          margin: 0 0 16px;
-          letter-spacing: -0.5px;
-        }
-        .ld-br { display: inline; }
-        .ld-hero-sub {
-          font-size: 15px;
-          line-height: 1.65;
-          color: var(--color-char-muted);
-          max-width: 520px;
-          margin: 0 auto 28px;
-        }
-        .ld-hero-ctas {
-          display: flex;
-          gap: 12px;
-          justify-content: center;
-          flex-wrap: wrap;
-        }
-        .ld-cta-primary {
-          padding: 11px 28px;
+        /* ── Shared buttons ── */
+        .ld-btn-primary {
+          padding: 12px 28px;
           background: var(--color-orange);
           color: #fff;
           border: none;
@@ -369,10 +528,12 @@ export default function Landing() {
           cursor: pointer;
           transition: background 0.15s;
           letter-spacing: 0.01em;
+          text-decoration: none;
+          display: inline-block;
         }
-        .ld-cta-primary:hover { background: var(--color-orange-hover); }
-        .ld-cta-secondary {
-          padding: 11px 24px;
+        .ld-btn-primary:hover { background: var(--color-orange-hover); }
+        .ld-btn-secondary {
+          padding: 12px 24px;
           background: transparent;
           color: var(--color-char-muted);
           border: 1px solid var(--color-border);
@@ -385,191 +546,298 @@ export default function Landing() {
           transition: background 0.15s, color 0.15s;
           display: inline-block;
         }
-        .ld-cta-secondary:hover { background: var(--color-beige); color: var(--color-char); }
+        .ld-btn-secondary:hover { background: var(--color-beige); color: var(--color-char); }
 
-        /* ── Stats ── */
-        .ld-stats {
-          display: grid;
-          grid-template-columns: repeat(3, 1fr);
-          gap: 12px;
-          margin-bottom: 28px;
+        /* ── Section typography ── */
+        .ld-section-h2 {
+          font-family: var(--font-display);
+          font-size: clamp(22px, 3vw, 30px);
+          font-weight: 700;
+          color: var(--color-char);
+          margin: 0 0 8px;
+          letter-spacing: -0.3px;
+          line-height: 1.2;
         }
-        .ld-stat {
-          display: flex;
-          flex-direction: column;
-          align-items: center;
-          gap: 4px;
-          padding: 18px 12px;
-          background: var(--color-beige);
-          border-radius: var(--radius-lg);
-          border: 1px solid var(--color-border);
-          text-align: center;
-        }
-        .ld-stat-val {
-          font-family: var(--font-mono);
-          font-size: 22px;
-          font-weight: 500;
-          color: var(--color-orange);
-          letter-spacing: -0.5px;
-        }
-        .ld-stat-label {
-          font-size: 11px;
+        .ld-section-sub {
+          font-family: var(--font-body);
+          font-size: 15px;
           color: var(--color-char-muted);
-          line-height: 1.3;
+          margin: 0 0 36px;
         }
 
-        /* ── Chat mockup ── */
-        .ld-mock {
+        /* ── Hero ── */
+        .ld-hero-section {
+          max-width: 1080px;
+          margin: 0 auto;
+          padding: 72px 32px 56px;
+        }
+        .ld-hero-inner {
+          display: grid;
+          grid-template-columns: 1fr 1fr;
+          gap: 56px;
+          align-items: center;
+        }
+        .ld-hero-copy { max-width: 480px; }
+        .ld-hero-title {
+          font-family: var(--font-display);
+          font-size: clamp(32px, 4.5vw, 54px);
+          font-weight: 700;
+          line-height: 1.1;
+          color: var(--color-char);
+          margin: 0 0 20px;
+          letter-spacing: -1px;
+        }
+        .ld-hero-sub {
+          font-family: var(--font-body);
+          font-size: 17px;
+          line-height: 1.72;
+          color: var(--color-char-muted);
+          margin: 0 0 32px;
+        }
+        .ld-hero-ctas { display: flex; gap: 12px; flex-wrap: wrap; }
+
+        /* ── Hero mock panel ── */
+        .ld-hero-mock-wrap { display: flex; justify-content: flex-end; }
+        .ld-hero-mock {
+          width: 100%;
+          max-width: 440px;
           background: var(--color-cream);
           border: 1px solid var(--color-border);
-          border-radius: var(--radius-xl);
-          padding: 18px;
-          margin-bottom: 28px;
+          border-radius: var(--radius-lg);
+          overflow: hidden;
+          box-shadow: 0 8px 32px rgba(0,0,0,0.07);
         }
-        .ld-mock-header {
+        .ld-mock-chrome {
           display: flex;
           align-items: center;
-          gap: 8px;
-          margin-bottom: 14px;
-          padding-bottom: 12px;
+          gap: 6px;
+          padding: 10px 14px;
+          background: var(--color-beige);
           border-bottom: 1px solid var(--color-border);
         }
-        .ld-mock-brand {
-          display: flex;
-          align-items: center;
-          gap: 5px;
+        .ld-chrome-dot {
+          width: 8px; height: 8px;
+          border-radius: 50%;
+          background: var(--color-border);
+          display: inline-block;
         }
-        .ld-mock-brand-text {
+        .ld-chrome-title {
           font-family: var(--font-mono);
-          font-size: 13px;
-          font-weight: 500;
-          color: var(--color-char);
-        }
-        .ld-mock-accuracy {
+          font-size: 11px;
+          color: var(--color-char-muted);
           margin-left: auto;
-          font-family: var(--font-mono);
-          font-size: 11px;
-          color: var(--color-char-muted);
         }
+        .ld-mock-body { padding: 14px; display: flex; flex-direction: column; gap: 10px; }
+        .ld-mock-ai-row { display: flex; gap: 8px; align-items: flex-start; }
+        .ld-mock-sigil { font-size: 14px; flex-shrink: 0; margin-top: 2px; }
+        .ld-mock-ai-content { display: flex; flex-direction: column; gap: 6px; flex: 1; min-width: 0; }
 
-        .ld-mock-user {
+        /* ── User bubble ── */
+        .mub-root { display: flex; justify-content: flex-end; }
+        .mub-bubble {
           background: var(--color-beige);
-          border-radius: 12px 12px 4px 12px;
-          padding: 10px 14px;
-          margin-bottom: 10px;
-          margin-left: 35%;
-          max-width: 65%;
-        }
-        .ld-mock-user p { font-size: 13px; margin: 0; color: var(--color-char); }
-
-        .ld-mock-ai {
-          background: var(--color-bg);
-          border: 1px solid var(--color-border);
-          border-radius: 12px 12px 12px 4px;
-          padding: 12px 14px;
-          margin-bottom: 12px;
+          border-radius: 12px 12px 3px 12px;
+          padding: 9px 13px;
           max-width: 85%;
+          font-family: var(--font-body);
+          font-size: 13px;
+          color: var(--color-char);
+          line-height: 1.5;
         }
-        .ld-mock-ai-text { font-size: 13px; margin: 0 0 10px; color: var(--color-char); line-height: 1.6; }
-        .ld-mock-caveat { font-size: 12px; margin: 8px 0 0; color: var(--color-char-muted); line-height: 1.5; }
 
-        /* Prediction card inside mock */
-        .ld-pred-card {
-          border: 1px solid var(--color-border);
-          border-radius: var(--radius-md);
-          padding: 12px;
-          margin-bottom: 4px;
-          background: var(--color-cream);
-        }
-        .ld-pred-teams {
-          display: flex;
-          justify-content: center;
-          align-items: center;
-          gap: 14px;
-          margin-bottom: 8px;
-        }
-        .ld-pred-team { font-size: 13px; font-weight: 600; color: var(--color-char); }
-        .ld-pred-score {
-          font-family: var(--font-mono);
-          font-size: 24px;
-          font-weight: 500;
-          color: var(--color-orange);
-          letter-spacing: 2px;
-        }
-        .ld-pred-probs {
-          display: flex;
-          justify-content: center;
-          gap: 14px;
-          font-family: var(--font-mono);
-          font-size: 11px;
+        /* ── Assistant bubble ── */
+        .mab-root { display: flex; gap: 8px; align-items: flex-start; }
+        .mab-sigil { font-size: 15px; flex-shrink: 0; margin-top: 2px; }
+        .mab-content { display: flex; flex-direction: column; gap: 8px; flex: 1; min-width: 0; }
+
+        /* ── Section card ── */
+        .msc-root { margin-bottom: 4px; }
+        .msc-label {
+          display: block;
+          font-family: var(--font-display);
+          font-size: 9px;
+          font-weight: 700;
+          text-transform: uppercase;
+          letter-spacing: 0.09em;
           color: var(--color-char-muted);
-          margin-bottom: 8px;
+          padding-bottom: 5px;
+          margin-bottom: 5px;
+          border-bottom: 1px solid var(--color-border);
         }
-        .ld-pred-bar {
+        .msc-body {
+          font-family: var(--font-body);
+          font-size: 13px;
+          color: var(--color-char);
+          line-height: 1.58;
+        }
+
+        /* ── Outcome bar ── */
+        .mob-root { margin: 6px 0 8px; }
+        .mob-labels {
           display: flex;
-          height: 4px;
-          border-radius: 2px;
+          justify-content: space-between;
+          font-family: var(--font-mono);
+          font-size: 10px;
+          color: var(--color-char-muted);
+          margin-bottom: 5px;
+        }
+        .mob-center { text-align: center; }
+        .mob-right { text-align: right; }
+        .mob-label strong { color: var(--color-char); }
+        .mob-bar {
+          display: flex;
+          height: 5px;
+          border-radius: 3px;
           overflow: hidden;
           gap: 2px;
         }
-        .ld-pred-bar-home { background: var(--color-orange); border-radius: 2px; }
-        .ld-pred-bar-draw { background: var(--color-beige-hover); border-radius: 2px; }
-        .ld-pred-bar-away { background: var(--color-border); border-radius: 2px; }
+        .mob-seg { border-radius: 3px; }
+        .mob-home { background: var(--color-orange); }
+        .mob-draw { background: var(--color-border); }
+        .mob-away { background: var(--color-char-muted); opacity: 0.45; }
 
-        /* Fixture chips */
-        .ld-mock-chips {
-          display: flex;
-          gap: 6px;
-          overflow-x: auto;
-          padding: 4px 0;
-          scrollbar-width: none;
+        /* ── Prediction card ── */
+        .mpc-root {
+          border: 1px solid var(--color-border);
+          border-left: 3px solid var(--color-orange);
+          border-radius: var(--radius-md);
+          padding: 10px 12px;
+          background: var(--color-cream);
+          margin-top: 4px;
         }
-        .ld-mock-chips::-webkit-scrollbar { display: none; }
-        .ld-mock-chip {
-          flex-shrink: 0;
-          padding: 5px 12px;
+        .mpc-header { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+        .mpc-label {
+          font-family: var(--font-display);
+          font-size: 9px;
+          font-weight: 700;
+          text-transform: uppercase;
+          letter-spacing: 0.09em;
+          color: var(--color-char-muted);
+        }
+        .mpc-conf {
+          font-family: var(--font-mono);
+          font-size: 9px;
+          padding: 2px 7px;
           border-radius: 99px;
           border: 1px solid var(--color-border);
-          background: transparent;
-          font-size: 11px;
           color: var(--color-char-muted);
-          cursor: pointer;
-          transition: background 0.15s, color 0.15s;
-          white-space: nowrap;
-          font-family: inherit;
         }
-        .ld-mock-chip:hover { background: var(--color-beige); color: var(--color-char); }
-
-        /* ── Section title ── */
-        .ld-section-title {
+        .mpc-conf-medium { color: var(--color-orange); border-color: var(--color-orange); }
+        .mpc-conf-high { color: #16a34a; border-color: #16a34a; }
+        .mpc-score {
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          gap: 12px;
+          margin-bottom: 8px;
+        }
+        .mpc-team {
           font-family: var(--font-display);
-          font-size: 16px;
+          font-size: 12px;
           font-weight: 600;
           color: var(--color-char);
-          margin: 0 0 14px;
+        }
+        .mpc-line {
+          font-family: var(--font-mono);
+          font-size: 20px;
+          font-weight: 600;
+          color: var(--color-orange);
+          letter-spacing: 2px;
+        }
+        .mpc-reasoning {
+          font-family: var(--font-body);
+          font-style: italic;
+          font-size: 12px;
+          color: var(--color-char-muted);
+          margin: 0;
+          line-height: 1.5;
         }
 
-        /* ── Pipeline steps ── */
-        .ld-pipeline { margin-bottom: 28px; }
-        .ld-steps { display: flex; flex-direction: column; }
-        .ld-step {
-          display: grid;
-          grid-template-columns: 36px 1fr;
-          gap: 12px;
-          align-items: start;
-          padding: 14px;
+        /* ── Stats strip ── */
+        .ld-stats-section {
+          background: var(--color-beige);
+          border-top: 1px solid var(--color-border);
+          border-bottom: 1px solid var(--color-border);
+          padding: 52px 32px;
+        }
+        .ld-stats-inner {
+          max-width: 680px;
+          margin: 0 auto;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+        }
+        .ld-stat { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 7px; text-align: center; }
+        .ld-stat-val {
+          font-family: var(--font-display);
+          font-size: clamp(34px, 4vw, 46px);
+          font-weight: 700;
+          color: var(--color-orange);
+          letter-spacing: -1.5px;
+          line-height: 1;
+        }
+        .ld-stat-label {
+          font-family: var(--font-display);
+          font-size: 11px;
+          font-weight: 500;
+          text-transform: uppercase;
+          letter-spacing: 0.07em;
+          color: var(--color-char-muted);
+        }
+        .ld-stat-divider {
+          width: 1px;
+          height: 52px;
+          background: var(--color-border);
+          flex-shrink: 0;
+          margin: 0 40px;
+        }
+
+        /* ── Chat demo ── */
+        .ld-demo-section {
+          max-width: 760px;
+          margin: 0 auto;
+          padding: 80px 32px;
+        }
+        .ld-demo-header { margin-bottom: 0; }
+        .ld-demo-panel {
           background: var(--color-cream);
           border: 1px solid var(--color-border);
-          border-top: none;
+          border-radius: var(--radius-lg);
+          padding: 28px;
+          display: flex;
+          flex-direction: column;
+          gap: 18px;
         }
-        .ld-step:first-child, .ld-step-first {
+
+        /* ── Pipeline ── */
+        .ld-pipeline-section {
+          background: var(--color-beige);
           border-top: 1px solid var(--color-border);
-          border-radius: var(--radius-md) var(--radius-md) 0 0;
+          border-bottom: 1px solid var(--color-border);
+          padding: 80px 32px;
         }
-        .ld-step-last { border-radius: 0 0 var(--radius-md) var(--radius-md); }
+        .ld-pipeline-header {
+          max-width: 720px;
+          margin: 0 auto;
+        }
+        .ld-steps {
+          display: flex;
+          flex-direction: column;
+          max-width: 720px;
+          margin: 0 auto;
+        }
+        .ld-step {
+          display: grid;
+          grid-template-columns: 44px 1fr;
+          gap: 20px;
+          padding: 28px 0;
+          border-bottom: 1px solid var(--color-border);
+        }
+        .ld-step:last-child { border-bottom: none; }
+        .ld-step-track { display: flex; flex-direction: column; align-items: center; }
         .ld-step-num {
-          width: 28px;
-          height: 28px;
+          width: 34px;
+          height: 34px;
           border-radius: 50%;
           background: var(--color-orange);
           color: #fff;
@@ -577,37 +845,72 @@ export default function Landing() {
           align-items: center;
           justify-content: center;
           font-family: var(--font-mono);
-          font-size: 12px;
+          font-size: 13px;
           font-weight: 600;
           flex-shrink: 0;
         }
-        .ld-step-title { font-size: 14px; font-weight: 600; margin: 0 0 3px; color: var(--color-char); }
-        .ld-step-body { font-size: 12px; margin: 0; color: var(--color-char-muted); line-height: 1.55; }
+        .ld-step-line {
+          width: 1px;
+          flex: 1;
+          background: var(--color-border);
+          margin-top: 8px;
+        }
+        .ld-step:last-child .ld-step-line { display: none; }
+        .ld-step-content { padding: 2px 0; }
+        .ld-step-title {
+          font-family: var(--font-display);
+          font-size: 16px;
+          font-weight: 600;
+          margin: 0 0 7px;
+          color: var(--color-char);
+        }
+        .ld-step-body {
+          font-family: var(--font-body);
+          font-size: 15px;
+          margin: 0;
+          color: var(--color-char-muted);
+          line-height: 1.68;
+        }
 
-        /* ── Feature cards ── */
+        /* ── Features ── */
+        .ld-features-section {
+          max-width: 1080px;
+          margin: 0 auto;
+          padding: 80px 32px;
+        }
         .ld-features {
           display: grid;
           grid-template-columns: repeat(3, 1fr);
-          gap: 12px;
-          margin-bottom: 28px;
+          gap: 16px;
         }
         .ld-feat-card {
           background: var(--color-cream);
           border: 1px solid var(--color-border);
           border-radius: var(--radius-lg);
-          padding: 16px;
+          padding: 26px;
+          transition: transform 0.2s ease;
         }
-        .ld-feat-icon { margin-bottom: 10px; }
-        .ld-feat-title { font-size: 13px; font-weight: 600; margin: 0 0 5px; color: var(--color-char); }
-        .ld-feat-body { font-size: 12px; margin: 0; color: var(--color-char-muted); line-height: 1.55; }
+        .ld-feat-card:hover { transform: translateY(-3px); }
+        .ld-feat-title {
+          font-family: var(--font-display);
+          font-size: 15px;
+          font-weight: 600;
+          margin: 0 0 9px;
+          color: var(--color-char);
+        }
+        .ld-feat-body {
+          font-family: var(--font-body);
+          font-size: 14px;
+          margin: 0;
+          color: var(--color-char-muted);
+          line-height: 1.68;
+        }
 
         /* ── Studio teaser ── */
-        .ld-studio {
-          background: var(--color-cream);
-          border: 1px solid var(--color-border);
-          border-radius: var(--radius-xl);
-          padding: 28px 24px;
-          margin-bottom: 28px;
+        .ld-studio-section {
+          max-width: 760px;
+          margin: 0 auto;
+          padding: 80px 32px;
           text-align: center;
         }
         .ld-studio-badge {
@@ -615,87 +918,70 @@ export default function Landing() {
           background: var(--color-beige);
           color: var(--color-char-muted);
           font-family: var(--font-mono);
-          font-size: 11px;
+          font-size: 10px;
           font-weight: 500;
           padding: 3px 12px;
           border-radius: 99px;
-          margin-bottom: 12px;
+          margin-bottom: 14px;
           border: 1px solid var(--color-border);
+          text-transform: uppercase;
+          letter-spacing: 0.07em;
         }
         .ld-studio-title {
           font-family: var(--font-display);
-          font-size: 20px;
+          font-size: clamp(20px, 3vw, 28px);
           font-weight: 700;
-          margin: 0 0 8px;
+          margin: 0 0 10px;
           color: var(--color-char);
+          letter-spacing: -0.3px;
         }
         .ld-studio-sub {
-          font-size: 13px;
+          font-family: var(--font-body);
+          font-size: 15px;
           color: var(--color-char-muted);
-          max-width: 460px;
-          margin: 0 auto 20px;
-          line-height: 1.6;
+          margin: 0 0 24px;
         }
-        .ld-studio-grid {
-          display: grid;
-          grid-template-columns: repeat(2, 1fr);
-          gap: 8px;
-          max-width: 480px;
-          margin: 0 auto;
-          text-align: left;
-        }
-        .ld-studio-item {
-          padding: 10px 12px;
-          background: var(--color-beige);
-          border-radius: var(--radius-md);
-        }
-        .ld-studio-item-title { font-size: 13px; font-weight: 600; margin: 0 0 2px; color: var(--color-char); }
-        .ld-studio-item-sub { font-size: 11px; margin: 0; color: var(--color-char-muted); }
-
-        /* ── Tech strip ── */
-        .ld-tech {
-          display: grid;
-          grid-template-columns: repeat(4, 1fr);
-          gap: 10px;
-          margin-bottom: 40px;
-        }
-        .ld-tech-item {
+        .ld-studio-queries {
           display: flex;
           flex-direction: column;
-          gap: 4px;
-          padding: 12px;
-          background: var(--color-beige);
-          border-radius: var(--radius-md);
-          text-align: center;
+          gap: 8px;
+          max-width: 520px;
+          margin: 0 auto;
         }
-        .ld-tech-label {
+        .ld-studio-query {
           font-family: var(--font-mono);
-          font-size: 10px;
+          font-size: 13px;
           color: var(--color-char-muted);
-          letter-spacing: 0.05em;
+          font-style: italic;
+          margin: 0;
+          padding: 12px 16px;
+          background: var(--color-beige);
+          border: 1px solid var(--color-border);
+          border-radius: var(--radius-md);
+          text-align: left;
+          line-height: 1.5;
         }
-        .ld-tech-value { font-size: 11px; color: var(--color-char-muted); line-height: 1.4; }
 
         /* ── Bottom CTA ── */
         .ld-cta-section {
           background: var(--color-beige);
-          border: 1px solid var(--color-border);
-          border-radius: var(--radius-xl);
-          padding: 36px 24px;
+          border-top: 1px solid var(--color-border);
+          padding: 80px 32px;
           text-align: center;
-          margin-bottom: 32px;
         }
         .ld-cta-title {
           font-family: var(--font-display);
-          font-size: 22px;
+          font-size: clamp(24px, 3.5vw, 38px);
           font-weight: 700;
-          margin: 0 0 8px;
+          margin: 0 0 12px;
           color: var(--color-char);
+          letter-spacing: -0.5px;
         }
         .ld-cta-sub {
-          font-size: 14px;
+          font-family: var(--font-body);
+          font-size: 15px;
           color: var(--color-char-muted);
-          margin: 0 0 20px;
+          margin: 0 0 28px;
         }
 
         /* ── Footer ── */
@@ -703,27 +989,36 @@ export default function Landing() {
           display: flex;
           align-items: center;
           justify-content: center;
-          gap: 12px;
-          padding: 8px 0 24px;
-          flex-wrap: wrap;
+          gap: 10px;
+          padding: 24px 32px;
+          border-top: 1px solid var(--color-border);
         }
         .ld-footer-brand {
           font-family: var(--font-mono);
           font-size: 13px;
           color: var(--color-char-muted);
         }
+        .ld-footer-sep { color: var(--color-border); }
         .ld-footer-sub { font-size: 12px; color: var(--color-char-muted); }
 
         /* ── Responsive ── */
-        @media (max-width: 600px) {
-          .ld-hero { padding: 36px 0 28px; }
-          .ld-stats { grid-template-columns: repeat(3, 1fr); gap: 8px; }
-          .ld-stat-val { font-size: 18px; }
+        @media (max-width: 860px) {
+          .ld-hero-inner { grid-template-columns: 1fr; }
+          .ld-hero-mock-wrap { display: none; }
+          .ld-hero-section { padding: 52px 24px 40px; }
           .ld-features { grid-template-columns: 1fr; }
-          .ld-tech { grid-template-columns: repeat(2, 1fr); }
-          .ld-studio-grid { grid-template-columns: 1fr; }
-          .ld-mock-user { margin-left: 20%; max-width: 80%; }
-          .ld-br { display: none; }
+          .ld-stats-inner { flex-direction: column; gap: 28px; }
+          .ld-stat-divider { width: 48px; height: 1px; margin: 0; }
+        }
+        @media (max-width: 600px) {
+          .ld-nav-inner,
+          .ld-demo-section,
+          .ld-features-section,
+          .ld-studio-section,
+          .ld-cta-section { padding-left: 20px; padding-right: 20px; }
+          .ld-pipeline-section { padding-left: 20px; padding-right: 20px; }
+          .ld-stats-section { padding-left: 20px; padding-right: 20px; }
+          .ld-demo-panel { padding: 18px; }
         }
       `}</style>
     </div>
