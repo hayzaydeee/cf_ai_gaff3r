@@ -8,7 +8,7 @@ bindings = [{ name = "USER_STATE", class_name = "UserState" }]
 
 [[migrations]]
 tag = "v1"
-new_classes = ["UserState"]
+new_sqlite_classes = ["UserState"]
 
 [[kv_namespaces]]
 binding = "FPL_CACHE"
