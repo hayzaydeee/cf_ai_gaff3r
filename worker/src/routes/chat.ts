@@ -14,6 +14,7 @@ import type { ChatRequest, ChatResponse, FixtureItem } from '../types/api';
 import type { ChatMessage, Prediction, AccuracyStats, Outcome } from '../types/app';
 import { fetchMatchContext } from '../services/match-context';
 import { runAnalysis, runAnalysisStreaming } from '../services/ai';
+import { classifyIntent, shouldRunModel, buildIntentHint } from '../services/intentClassifier';
 import { SYSTEM_PROMPT, buildPLUserMessage, buildStandardUserMessage } from '../prompts/gaffer';
 import { fetchFixtures, fetchBootstrap } from '../services/fpl';
 import { fetchUpcomingMatches } from '../services/football-data';
@@ -96,11 +97,16 @@ export async function handleChat(
     }
   }
 
-  // Step 6: Run statistical model and assemble prompt
+  // Step 6: Classify intent — gates model execution and injects prompt hint
+  const intent = classifyIntent(message);
+  const intentHint = buildIntentHint(intent);
+
+  // Run statistical model only for result/general queries (null intent)
+  // Scorer, lineup, btts, and analyse queries don't benefit from Monte Carlo output
   let modelBlock: string | null = null;
   let simResult: SimResult | null = null;
   let adjustmentNotes: string[] = [];
-  if (matchContext) {
+  if (matchContext && shouldRunModel(intent)) {
     try {
       let modelResult: ModelResult | null = null;
       if (matchContext.type === 'pl') {
@@ -135,9 +141,9 @@ export async function handleChat(
 
   let userPrompt: string;
   if (matchContext && matchContext.type === 'pl') {
-    userPrompt = buildPLUserMessage(matchContext, message, accuracy, modelBlock, ragBlock);
+    userPrompt = buildPLUserMessage(matchContext, message, accuracy, modelBlock, ragBlock, intentHint || null);
   } else if (matchContext && matchContext.type === 'standard') {
-    userPrompt = buildStandardUserMessage(matchContext, message, accuracy, modelBlock, ragBlock);
+    userPrompt = buildStandardUserMessage(matchContext, message, accuracy, modelBlock, ragBlock, intentHint || null);
   } else {
     // General football chat — no fixture context available
     userPrompt = `USER MESSAGE: "${message}"\n\n(No specific fixture data available. Provide general football analysis. If they're asking about a match you cannot identify, say so and offer general insights based on what you know.)`;

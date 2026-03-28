@@ -296,7 +296,20 @@ export async function runAnalysisStreaming(
         .replace(/<<<PREDICTION_JSON>>>[\s\S]*?<<<END_PREDICTION_JSON>>>/g, '')
         .trim();
 
-      emit({ type: 'done', response: cleanResponse, prediction, typedPrediction, ...extraDoneData });
+      // Approach B safety net: strip simResult/adjustmentNotes from done event
+      // when the extracted prediction type is not 'result'.
+      // This catches cases where the classifier returned null but the LLM produced
+      // a non-result sub-type — prevents the Dixon-Coles block from rendering.
+      const isResultType = !typedPrediction || typedPrediction.type === 'result';
+      const { simResult: simData, adjustmentNotes: adjNotes, ...restExtraDone } = extraDoneData;
+      emit({
+        type: 'done',
+        response: cleanResponse,
+        prediction,
+        typedPrediction,
+        ...(isResultType ? { simResult: simData, adjustmentNotes: adjNotes } : {}),
+        ...restExtraDone,
+      });
       controller.close();
 
       // Post-processing runs after stream closes so it never blocks the done event

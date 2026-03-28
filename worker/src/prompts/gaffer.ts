@@ -168,6 +168,7 @@ export function buildPLUserMessage(
   accuracy: AccuracyStats | null,
   modelBlock: string | null = null,
   ragBlock: string | null = null,
+  intentHint: string | null = null,
 ): string {
   const { fixture, fplDifficulty, homeTeam, awayTeam } = context;
 
@@ -192,7 +193,7 @@ export function buildPLUserMessage(
     : 'No predictions yet.';
 
   return `USER MESSAGE: "${userMessage}"
-
+${intentHint ? `\n${intentHint}\n` : ''}
 ═══ MATCH DATA (Premier League, Enhanced) ═══
 
 FIXTURE: ${fixture.homeTeam} vs ${fixture.awayTeam}
@@ -233,6 +234,7 @@ export function buildStandardUserMessage(
   accuracy: AccuracyStats | null,
   modelBlock: string | null = null,
   ragBlock: string | null = null,
+  intentHint: string | null = null,
 ): string {
   const { fixture, homeTeam, awayTeam } = context;
 
@@ -241,7 +243,7 @@ export function buildStandardUserMessage(
     : 'No predictions yet.';
 
   return `USER MESSAGE: "${userMessage}"
-
+${intentHint ? `\n${intentHint}\n` : ''}
 ═══ MATCH DATA (${fixture.competition}) ═══
 
 FIXTURE: ${fixture.homeTeam} vs ${fixture.awayTeam}
