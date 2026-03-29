@@ -14,7 +14,7 @@ const FPL_BASE = 'https://fantasy.premierleague.com/api';
 
 // Cache TTLs in seconds
 const BOOTSTRAP_TTL = 6 * 60 * 60;    // 6 hours
-const FIXTURES_TTL = 30 * 60;          // 30 minutes
+const FIXTURES_TTL = 6 * 60 * 60;     // 6 hours — finished GW fixture data never changes
 
 /**
  * Fetch the bootstrap-static endpoint (teams, players, events).
@@ -497,17 +497,16 @@ export function computeLeaguePositions(fixtures: FPLFixture[]): Map<number, numb
 
 /**
  * Fetch all finished fixtures across the season for standings computation.
+ * Aggregated into a single cache key keyed by current GW to avoid N KV reads per request.
  */
 async function getAllSeasonFixtures(kv: KVNamespace, events: FPLEvent[]): Promise<FPLFixture[]> {
-  const finishedGWs = events.filter(e => e.finished || e.is_current);
-  const allFixtures: FPLFixture[] = [];
+  const relevantGWs = events.filter(e => e.finished || e.is_current);
+  if (relevantGWs.length === 0) return [];
 
-  // Fetch up to all finished GWs. We batch this via Promise.all.
-  const batches = finishedGWs.map(e => fetchFixtures(kv, e.id));
-  const results = await Promise.all(batches);
-  for (const gwFixtures of results) {
-    allFixtures.push(...gwFixtures);
-  }
-
-  return allFixtures;
+  // Single aggregated cache key — invalidates naturally when latestGW advances
+  const latestGW = Math.max(...relevantGWs.map(e => e.id));
+  return getCachedOrFetch(kv, `fpl:fixtures:season:${latestGW}`, async () => {
+    const results = await Promise.all(relevantGWs.map(e => fetchFixtures(kv, e.id)));
+    return results.flat();
+  }, BOOTSTRAP_TTL);
 }
