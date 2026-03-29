@@ -12,6 +12,7 @@ describe('team alias lookups', () => {
   });
 
   it('still supports direct fpl id mapping when ids are known', () => {
-    expect(getFdIdByFplId(6)).toBe(61);
+    expect(getFdIdByFplId(6)).toBe(397);  // fplId 6 = Brighton (fdId 397)
+    expect(getFdIdByFplId(7)).toBe(61);   // fplId 7 = Chelsea (fdId 61)
   });
 });
