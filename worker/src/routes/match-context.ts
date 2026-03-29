@@ -1,6 +1,7 @@
 import type { Env } from '../types/env';
 import type { MatchContextResponse } from '../types/api';
 import { fetchMatchContext } from '../services/match-context';
+import { createRedisClient } from '../services/redis';
 
 export async function handleGetMatchContext(request: Request, env: Env): Promise<Response> {
   const url = new URL(request.url);
@@ -19,7 +20,7 @@ export async function handleGetMatchContext(request: Request, env: Env): Promise
     competitionCode,
     fixtureId,
     gameweek,
-    env.FPL_CACHE,
+    createRedisClient(env),
     env
   );
 

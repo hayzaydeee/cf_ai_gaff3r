@@ -13,7 +13,8 @@ import type {
 } from '../types/football-data';
 import type { StandardMatchContext, StandardTeamContext, RecentResult } from '../types/app';
 import type { Env } from '../types/env';
-import { getCachedOrFetch } from './cache';
+import { getRedisOrFetch } from './cache';
+import type { Redis } from './redis';
 
 const FD_BASE = 'https://api.football-data.org/v4';
 
@@ -45,10 +46,10 @@ async function fdFetch(path: string, apiKey: string): Promise<Response> {
  * Fetch upcoming matches across all supported competitions (next 7 days).
  */
 export async function fetchUpcomingMatches(
-  kv: KVNamespace,
+  redis: Redis,
   env: Env
 ): Promise<FDMatch[]> {
-  return getCachedOrFetch(kv, 'fd:matches:upcoming', async () => {
+  return getRedisOrFetch(redis, 'fd:matches:upcoming', async () => {
     const now = new Date();
     const weekFromNow = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
     const dateFrom = now.toISOString().split('T')[0];
@@ -70,11 +71,11 @@ export async function fetchUpcomingMatches(
  * Fetch league standings for a competition.
  */
 export async function fetchStandings(
-  kv: KVNamespace,
+  redis: Redis,
   env: Env,
   competitionCode: string
 ): Promise<FDStandingsResponse> {
-  return getCachedOrFetch(kv, `fd:standings:${competitionCode}`, async () => {
+  return getRedisOrFetch(redis, `fd:standings:${competitionCode}`, async () => {
     const res = await fdFetch(
       `/competitions/${competitionCode}/standings`,
       env.FOOTBALL_DATA_API_KEY
@@ -87,11 +88,11 @@ export async function fetchStandings(
  * Fetch a team's recent finished matches (last 5).
  */
 export async function fetchTeamRecentMatches(
-  kv: KVNamespace,
+  redis: Redis,
   env: Env,
   teamId: number
 ): Promise<FDMatch[]> {
-  return getCachedOrFetch(kv, `fd:team:${teamId}:recent`, async () => {
+  return getRedisOrFetch(redis, `fd:team:${teamId}:recent`, async () => {
     const res = await fdFetch(
       `/teams/${teamId}/matches?status=FINISHED&limit=5`,
       env.FOOTBALL_DATA_API_KEY
@@ -113,23 +114,23 @@ export async function fetchMatch(
 }
 
 export async function fetchTeamDetails(
-  kv: KVNamespace,
+  redis: Redis,
   env: Env,
   teamId: number
 ): Promise<FDTeamResponse> {
-  return getCachedOrFetch(kv, `fd:team:${teamId}:details`, async () => {
+  return getRedisOrFetch(redis, `fd:team:${teamId}:details`, async () => {
     const res = await fdFetch(`/teams/${teamId}`, env.FOOTBALL_DATA_API_KEY);
     return res.json() as Promise<FDTeamResponse>;
   }, TEAM_DETAILS_TTL);
 }
 
 export async function fetchCompetitionScorers(
-  kv: KVNamespace,
+  redis: Redis,
   env: Env,
   competitionCode: string,
   limit = 40
 ): Promise<FDScorer[]> {
-  return getCachedOrFetch(kv, `fd:scorers:${competitionCode}:${limit}`, async () => {
+  return getRedisOrFetch(redis, `fd:scorers:${competitionCode}:${limit}`, async () => {
     const res = await fdFetch(
       `/competitions/${competitionCode}/scorers?limit=${limit}`,
       env.FOOTBALL_DATA_API_KEY
@@ -188,14 +189,14 @@ export function buildStandardTeamContext(
  */
 export async function buildStandardMatchContext(
   match: FDMatch,
-  kv: KVNamespace,
+  redis: Redis,
   env: Env
 ): Promise<StandardMatchContext> {
   // Fetch standings and recent matches for both teams in parallel
   const [standings, homeRecent, awayRecent] = await Promise.all([
-    fetchStandings(kv, env, match.competition.code),
-    fetchTeamRecentMatches(kv, env, match.homeTeam.id),
-    fetchTeamRecentMatches(kv, env, match.awayTeam.id),
+    fetchStandings(redis, env, match.competition.code),
+    fetchTeamRecentMatches(redis, env, match.homeTeam.id),
+    fetchTeamRecentMatches(redis, env, match.awayTeam.id),
   ]);
 
   return {

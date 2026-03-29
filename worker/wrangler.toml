@@ -11,10 +11,6 @@ bindings = [{ name = "USER_STATE", class_name = "UserState" }]
 tag = "v1"
 new_sqlite_classes = ["UserState"]
 
-[[kv_namespaces]]
-binding = "FPL_CACHE"
-id = "d5fe3844a311424e9e6fb8765807e036"
-
 # Workers AI
 # AI Gateway is configured at runtime via env.AI.run(..., { gateway: { id: "gaff3r-gateway" } })
 [ai]

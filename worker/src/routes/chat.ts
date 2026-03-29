@@ -22,6 +22,7 @@ import { fetchUpcomingMatches } from '../services/football-data';
 import { identifyFixture } from '../services/fixture-matcher';
 import { runPLModel, runStandardModel, formatModelBlock, type SimResult, type ModelResult } from '../models';
 import { queryRelevantAnalyses, storeAnalysis } from '../services/vectorStore';
+import { createRedisClient } from '../services/redis';
 
 /**
  * POST /api/chat
@@ -45,6 +46,9 @@ export async function handleChat(
   const doId = env.USER_STATE.idFromName(userId);
   const doStub = env.USER_STATE.get(doId);
 
+  // Redis client — one instance for the lifetime of this request
+  const redis = createRedisClient(env);
+
   // Initialize profile
   await doStub.fetch(new Request('http://do/init', {
     method: 'POST',
@@ -55,7 +59,7 @@ export async function handleChat(
   const [accuracyRes, chatHistoryRes, allUpcoming] = await Promise.all([
     doStub.fetch(new Request('http://do/accuracy')),
     doStub.fetch(new Request(`http://do/chat/${gameweek}`)),
-    fetchAllUpcomingFixtures(gameweek, env),
+    fetchAllUpcomingFixtures(gameweek, redis, env),
   ]);
 
   const accuracy = await accuracyRes.json() as AccuracyStats;
@@ -89,7 +93,7 @@ export async function handleChat(
         resolvedCompetitionCode,
         resolvedFixtureId,
         gameweek,
-        env.FPL_CACHE,
+        redis,
         env
       );
     } catch (err) {
@@ -110,11 +114,32 @@ export async function handleChat(
   if (matchContext && shouldRunModel(intent)) {
     try {
       let modelResult: ModelResult | null = null;
-      if (matchContext.type === 'pl') {
-        modelResult = runPLModel(matchContext);
+
+      // Phase 5: Cache Monte Carlo results — params are stable for a given fixture+GW
+      // Saves ~500ms-1s of CPU-bound simulation on repeated requests for the same match
+      if (fixtureItem) {
+        const modelKey = `model:${fixtureItem.homeTeamId}:${fixtureItem.awayTeamId}:${gameweek}`;
+        const cachedModel = await redis.get<ModelResult>(modelKey);
+        if (cachedModel) {
+          modelResult = cachedModel;
+        } else {
+          if (matchContext.type === 'pl') {
+            modelResult = runPLModel(matchContext);
+          } else {
+            modelResult = runStandardModel(matchContext);
+          }
+          if (modelResult) {
+            redis.set(modelKey, modelResult, { ex: 30 * 60 }).catch(() => {});
+          }
+        }
       } else {
-        modelResult = runStandardModel(matchContext);
+        if (matchContext.type === 'pl') {
+          modelResult = runPLModel(matchContext);
+        } else {
+          modelResult = runStandardModel(matchContext);
+        }
       }
+
       if (modelResult) {
         simResult = modelResult.simResult;
         adjustmentNotes = modelResult.adjustmentNotes;
@@ -431,12 +456,12 @@ export async function handleChat(
  * Fetch all upcoming fixtures across PL + other competitions.
  * Used for server-side fixture identification from free text.
  */
-async function fetchAllUpcomingFixtures(gameweek: number, env: Env): Promise<FixtureItem[]> {
+async function fetchAllUpcomingFixtures(gameweek: number, redis: ReturnType<typeof createRedisClient>, env: Env): Promise<FixtureItem[]> {
   try {
     const [fplFixtures, bootstrap, fdMatches] = await Promise.all([
-      fetchFixtures(env.FPL_CACHE, gameweek),
-      fetchBootstrap(env.FPL_CACHE),
-      fetchUpcomingMatches(env.FPL_CACHE, env).catch(() => []),
+      fetchFixtures(redis, gameweek),
+      fetchBootstrap(redis),
+      fetchUpcomingMatches(redis, env).catch(() => []),
     ]);
 
     const teamMap = new Map(bootstrap.teams.map(t => [t.id, t]));

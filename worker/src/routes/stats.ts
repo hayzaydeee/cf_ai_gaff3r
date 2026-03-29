@@ -6,6 +6,7 @@ import type { AccuracyStats, Prediction } from '../types/app';
 import type { StatsResponse } from '../types/api';
 import { fetchFixtures, fetchBootstrap } from '../services/fpl';
 import { fetchMatch } from '../services/football-data';
+import { createRedisClient } from '../services/redis';
 
 /**
  * GET /api/stats
@@ -47,6 +48,7 @@ export async function handleResolve(
 ): Promise<Response> {
   const doId = env.USER_STATE.idFromName(userId);
   const doStub = env.USER_STATE.get(doId);
+  const redis = createRedisClient(env);
 
   // Get all predictions
   const predsRes = await doStub.fetch(new Request('http://do/predictions'));
@@ -64,7 +66,7 @@ export async function handleResolve(
 
         if (pred.competitionCode === 'PL') {
           // Check FPL fixtures for the result
-          const fixtures = await fetchFixtures(env.FPL_CACHE, pred.gameweek);
+          const fixtures = await fetchFixtures(redis, pred.gameweek);
           const fixture = fixtures.find(f => f.id === pred.fixtureId);
           if (fixture && fixture.finished && fixture.team_h_score !== null && fixture.team_a_score !== null) {
             actualScore = { home: fixture.team_h_score, away: fixture.team_a_score };

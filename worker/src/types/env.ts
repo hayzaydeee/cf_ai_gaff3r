@@ -4,9 +4,6 @@ export interface Env {
   // Durable Objects
   USER_STATE: DurableObjectNamespace;
 
-  // KV Namespaces
-  FPL_CACHE: KVNamespace;
-
   // Workers AI (AI Gateway configured at runtime)
   AI: Ai;
 
@@ -27,4 +24,9 @@ export interface Env {
   GOOGLE_CLIENT_ID: string;
   GOOGLE_CLIENT_SECRET: string;
   SENDGRID_API_KEY: string;
+
+  // Upstash Redis — set via: wrangler secret put UPSTASH_REDIS_REST_URL
+  //                          wrangler secret put UPSTASH_REDIS_REST_TOKEN
+  UPSTASH_REDIS_REST_URL: string;
+  UPSTASH_REDIS_REST_TOKEN: string;
 }

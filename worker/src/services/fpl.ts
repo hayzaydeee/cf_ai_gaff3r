@@ -6,7 +6,8 @@ import type { FPLBootstrapResponse, FPLTeam, FPLPlayer, FPLFixture, FPLEvent } f
 import type { FDPerson, FDScorer } from '../types/football-data';
 import type { PLMatchContext, PLTeamContext, KeyPlayer, InjuryReport } from '../types/app';
 import type { Env } from '../types/env';
-import { getCachedOrFetch } from './cache';
+import { getRedisOrFetch } from './cache';
+import type { Redis } from './redis';
 import { fetchCompetitionScorers, fetchTeamDetails } from './football-data';
 import { getFdIdByFplId, getFdIdByTeamName } from '../utils/team-aliases';
 
@@ -20,8 +21,8 @@ const FIXTURES_TTL = 6 * 60 * 60;     // 6 hours — finished GW fixture data ne
  * Fetch the bootstrap-static endpoint (teams, players, events).
  * This is the main FPL data source — ~4MB raw, cached aggressively.
  */
-export async function fetchBootstrap(kv: KVNamespace): Promise<FPLBootstrapResponse> {
-  return getCachedOrFetch(kv, 'fpl:bootstrap', async () => {
+export async function fetchBootstrap(redis: Redis): Promise<FPLBootstrapResponse> {
+  return getRedisOrFetch(redis, 'fpl:bootstrap', async () => {
     const res = await fetch(`${FPL_BASE}/bootstrap-static/`);
     if (!res.ok) throw new Error(`FPL bootstrap failed: ${res.status}`);
     return res.json() as Promise<FPLBootstrapResponse>;
@@ -31,8 +32,8 @@ export async function fetchBootstrap(kv: KVNamespace): Promise<FPLBootstrapRespo
 /**
  * Fetch fixtures for a specific gameweek.
  */
-export async function fetchFixtures(kv: KVNamespace, gameweek: number): Promise<FPLFixture[]> {
-  return getCachedOrFetch(kv, `fpl:fixtures:${gameweek}`, async () => {
+export async function fetchFixtures(redis: Redis, gameweek: number): Promise<FPLFixture[]> {
+  return getRedisOrFetch(redis, `fpl:fixtures:${gameweek}`, async () => {
     const res = await fetch(`${FPL_BASE}/fixtures/?event=${gameweek}`);
     if (!res.ok) throw new Error(`FPL fixtures failed: ${res.status}`);
     return res.json() as Promise<FPLFixture[]>;
@@ -42,12 +43,12 @@ export async function fetchFixtures(kv: KVNamespace, gameweek: number): Promise<
 /**
  * Derive current and next gameweek from bootstrap events.
  */
-export async function getCurrentGameweek(kv: KVNamespace): Promise<{
+export async function getCurrentGameweek(redis: Redis): Promise<{
   current: number;
   next: number;
   nextDeadline: string;
 }> {
-  const bootstrap = await fetchBootstrap(kv);
+  const bootstrap = await fetchBootstrap(redis);
   const events = bootstrap.events;
 
   const current = events.find(e => e.is_current);
@@ -246,12 +247,12 @@ function computeTeamStats(teamId: number, fixtures: FPLFixture[]) {
 export async function buildPLMatchContext(
   fixtureId: number,
   gameweek: number,
-  kv: KVNamespace,
+  redis: Redis,
   env: Env
 ): Promise<PLMatchContext> {
   const [bootstrap, gwFixtures] = await Promise.all([
-    fetchBootstrap(kv),
-    fetchFixtures(kv, gameweek),
+    fetchBootstrap(redis),
+    fetchFixtures(redis, gameweek),
   ]);
 
   const fixture = gwFixtures.find(f => f.id === fixtureId);
@@ -262,7 +263,7 @@ export async function buildPLMatchContext(
   if (!homeTeam || !awayTeam) throw new Error('Teams not found in bootstrap');
 
   // Fetch ALL fixtures for the season to compute standings + recent form
-  const allFixtures = await getAllSeasonFixtures(kv, bootstrap.events);
+  const allFixtures = await getAllSeasonFixtures(redis, bootstrap.events);
   const leaguePositions = computeLeaguePositions(allFixtures);
 
   const homeTeamContext = buildPLTeamContext(fixture.team_h, bootstrap, allFixtures, gameweek);
@@ -271,7 +272,7 @@ export async function buildPLMatchContext(
   homeTeamContext.leaguePosition = leaguePositions.get(fixture.team_h) ?? 0;
   awayTeamContext.leaguePosition = leaguePositions.get(fixture.team_a) ?? 0;
 
-  await enrichPLPersonnel(homeTeamContext, awayTeamContext, fixture.team_h, fixture.team_a, kv, env);
+  await enrichPLPersonnel(homeTeamContext, awayTeamContext, fixture.team_h, fixture.team_a, redis, env);
 
   return {
     type: 'pl',
@@ -297,7 +298,7 @@ async function enrichPLPersonnel(
   awayTeamContext: PLTeamContext,
   homeFplTeamId: number,
   awayFplTeamId: number,
-  kv: KVNamespace,
+  redis: Redis,
   env: Env
 ): Promise<void> {
   const homeFdTeamId = getFdIdByFplId(homeFplTeamId) ?? getFdIdByTeamName(homeTeamContext.name);
@@ -308,9 +309,9 @@ async function enrichPLPersonnel(
   }
 
   const [homeTeamDetails, awayTeamDetails, scorers] = await Promise.all([
-    fetchTeamDetails(kv, env, homeFdTeamId).catch(() => null),
-    fetchTeamDetails(kv, env, awayFdTeamId).catch(() => null),
-    fetchCompetitionScorers(kv, env, 'PL').catch(() => [] as FDScorer[]),
+    fetchTeamDetails(redis, env, homeFdTeamId).catch(() => null),
+    fetchTeamDetails(redis, env, awayFdTeamId).catch(() => null),
+    fetchCompetitionScorers(redis, env, 'PL').catch(() => [] as FDScorer[]),
   ]);
 
   const homeSquad = homeTeamDetails?.squad ?? [];
@@ -499,14 +500,14 @@ export function computeLeaguePositions(fixtures: FPLFixture[]): Map<number, numb
  * Fetch all finished fixtures across the season for standings computation.
  * Aggregated into a single cache key keyed by current GW to avoid N KV reads per request.
  */
-async function getAllSeasonFixtures(kv: KVNamespace, events: FPLEvent[]): Promise<FPLFixture[]> {
+async function getAllSeasonFixtures(redis: Redis, events: FPLEvent[]): Promise<FPLFixture[]> {
   const relevantGWs = events.filter(e => e.finished || e.is_current);
   if (relevantGWs.length === 0) return [];
 
   // Single aggregated cache key — invalidates naturally when latestGW advances
   const latestGW = Math.max(...relevantGWs.map(e => e.id));
-  return getCachedOrFetch(kv, `fpl:fixtures:season:${latestGW}`, async () => {
-    const results = await Promise.all(relevantGWs.map(e => fetchFixtures(kv, e.id)));
+  return getRedisOrFetch(redis, `fpl:fixtures:season:${latestGW}`, async () => {
+    const results = await Promise.all(relevantGWs.map(e => fetchFixtures(redis, e.id)));
     return results.flat();
   }, BOOTSTRAP_TTL);
 }

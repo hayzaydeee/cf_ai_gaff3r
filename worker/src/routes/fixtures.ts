@@ -6,13 +6,15 @@ import type { Env } from '../types/env';
 import type { FixtureItem, FixturesResponse, GameweekResponse } from '../types/api';
 import { getCurrentGameweek, fetchFixtures, fetchBootstrap } from '../services/fpl';
 import { fetchUpcomingMatches } from '../services/football-data';
+import { createRedisClient } from '../services/redis';
 
 /**
  * GET /api/gameweek/current
  * Returns current + next GW IDs.
  */
 export async function handleGetGameweek(env: Env): Promise<Response> {
-  const gw = await getCurrentGameweek(env.FPL_CACHE);
+  const redis = createRedisClient(env);
+  const gw = await getCurrentGameweek(redis);
 
   const body: GameweekResponse = {
     current: gw.current,
@@ -28,9 +30,10 @@ export async function handleGetGameweek(env: Env): Promise<Response> {
  * Returns PL fixtures for a gameweek + non-PL upcoming fixtures.
  */
 export async function handleGetFixtures(gameweek: number, env: Env): Promise<Response> {
+  const redis = createRedisClient(env);
   const [fplFixtures, bootstrap] = await Promise.all([
-    fetchFixtures(env.FPL_CACHE, gameweek),
-    fetchBootstrap(env.FPL_CACHE),
+    fetchFixtures(redis, gameweek),
+    fetchBootstrap(redis),
   ]);
 
   const teamMap = new Map(bootstrap.teams.map(t => [t.id, t]));
@@ -66,15 +69,16 @@ export async function handleGetFixtures(gameweek: number, env: Env): Promise<Res
  * Returns upcoming fixtures across all competitions (next 7 days).
  */
 export async function handleGetUpcoming(env: Env): Promise<Response> {
+  const redis = createRedisClient(env);
   const [plGw, fdMatches] = await Promise.all([
-    getCurrentGameweek(env.FPL_CACHE),
-    fetchUpcomingMatches(env.FPL_CACHE, env),
+    getCurrentGameweek(redis),
+    fetchUpcomingMatches(redis, env),
   ]);
 
   // Get PL fixtures for current GW
   const [fplFixtures, bootstrap] = await Promise.all([
-    fetchFixtures(env.FPL_CACHE, plGw.current),
-    fetchBootstrap(env.FPL_CACHE),
+    fetchFixtures(redis, plGw.current),
+    fetchBootstrap(redis),
   ]);
 
   const teamMap = new Map(bootstrap.teams.map(t => [t.id, t]));
