@@ -5,6 +5,7 @@
 import type { Env } from '../types/env';
 import type { Confidence } from '../types/app';
 import type { TypedPredictionPayload, PredictionType } from '../types/api';
+import { log } from '../utils/logger';
 
 const PRIMARY_MODEL = '@cf/meta/llama-3.3-70b-instruct-fp8-fast';
 const FALLBACK_MODEL = '@cf/meta/llama-3.1-8b-instruct';
@@ -39,13 +40,18 @@ export async function runAnalysis(
 ): Promise<AIResult> {
   let response: string;
 
+  const start = Date.now();
   try {
     response = await callModel(env, PRIMARY_MODEL, systemPrompt, userMessage);
+    log('ai_call', { model: PRIMARY_MODEL, ms: Date.now() - start });
   } catch (err) {
-    console.warn(`Primary model failed, falling back: ${err}`);
+    log('ai_fallback', { model: PRIMARY_MODEL, fallback: FALLBACK_MODEL, error: String(err), ms: Date.now() - start }, 'warn');
+    const fallbackStart = Date.now();
     try {
       response = await callModel(env, FALLBACK_MODEL, systemPrompt, userMessage);
+      log('ai_call', { model: FALLBACK_MODEL, ms: Date.now() - fallbackStart });
     } catch (fallbackErr) {
+      log('ai_call', { model: FALLBACK_MODEL, error: String(fallbackErr), ms: Date.now() - fallbackStart }, 'error');
       throw new Error(`Both AI models failed. Primary: ${err}. Fallback: ${fallbackErr}`);
     }
   }
@@ -118,7 +124,7 @@ export function extractTypedPrediction(response: string): TypedPredictionPayload
     }
     return null;
   } catch (err) {
-    console.warn('Failed to parse typed prediction JSON:', err);
+    log('stream_error', { phase: 'parse_typed_prediction', error: String(err) }, 'warn');
     return null;
   }
 }

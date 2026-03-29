@@ -69,7 +69,12 @@ export default {
   async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
     const url = new URL(request.url);
     const path = url.pathname;
+    const method = request.method;
+    const requestId = crypto.randomUUID().slice(0, 8);
+    const start = Date.now();
     const origin = request.headers.get('Origin') ?? '';
+
+    log('http_request', { requestId, method, path });
 
     // Handle CORS preflight
     if (request.method === 'OPTIONS') {
@@ -226,7 +231,7 @@ export default {
       return secured(errorResponse('Not Found', 404), origin);
 
     } catch (err) {
-      console.error('Worker error:', err);
+      log('stream_error', { requestId, method, path, error: String(err), ms: Date.now() - start }, 'error');
       // Never leak internal error messages in production
       return secured(errorResponse('Internal Server Error', 500), origin);
     }

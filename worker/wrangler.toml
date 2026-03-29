@@ -58,7 +58,7 @@ crons = ["0 2 * * 1", "0 8 * * *"]
 
 
 [observability]
-enabled = false
+enabled = true
 head_sampling_rate = 1
 
 [observability.logs]

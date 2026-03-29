@@ -13,7 +13,10 @@ export type LogEvent =
   | 'migration_completed'
   | 'stream_error'
   | 'cron_started'
-  | 'cron_completed';
+  | 'cron_completed'
+  | 'http_request'
+  | 'ai_call'
+  | 'ai_fallback';
 
 type Severity = 'info' | 'warn' | 'error';
 
