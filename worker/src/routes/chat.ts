@@ -129,7 +129,7 @@ export async function handleChat(
             modelResult = runStandardModel(matchContext);
           }
           if (modelResult) {
-            redis.set(modelKey, modelResult, { ex: 30 * 60 }).catch(() => {});
+            await redis.set(modelKey, modelResult, { ex: 30 * 60 }).catch(() => {});
           }
         }
       } else {

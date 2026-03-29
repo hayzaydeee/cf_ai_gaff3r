@@ -21,6 +21,10 @@ export function createRedisClient(env: Env): Redis {
 /**
  * Read from Redis cache; on miss call fetcher(), store result with TTL, return it.
  * Native Redis TTL replaces the CachedValue metadata wrapper used with KV.
+ *
+ * NOTE: The SET is awaited — Cloudflare Workers kill fire-and-forget promises once
+ * the Response is returned (without ctx.waitUntil), so a non-awaited SET would mean
+ * the cache is never populated and every request hits the cold path.
  */
 export async function getRedisOrFetch<T>(
   redis: Redis,
@@ -32,9 +36,9 @@ export async function getRedisOrFetch<T>(
   if (cached !== null) return cached;
 
   const data = await fetcher();
-  // fire-and-forget the write so latency of the SET doesn't block the caller
-  redis.set(key, data, { ex: ttlSeconds }).catch(() => {
-    // swallow write errors — stale or cold cache is acceptable
+  // Await the write — fast (<5ms) and essential; fire-and-forget is killed by CF Workers
+  await redis.set(key, data, { ex: ttlSeconds }).catch(() => {
+    // swallow write errors — a failed cache write is non-fatal
   });
   return data;
 }
