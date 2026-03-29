@@ -1,7 +1,6 @@
 // Dual-ID team alias map
 // Maps common team names → { fplId, fdId }
-// fplId = -1 for non-PL teams
-// TODO: Phase 1 implementation
+// fplId = -1 for non-PL teams (relegated sides kept for fixture matching)
 
 export const TEAM_ALIASES: Record<string, { fplId: number; fdId: number }> = {
   // Premier League 2025/26 — fplId values verified against bootstrap-static on 2026-03-29
@@ -28,38 +27,6 @@ export const TEAM_ALIASES: Record<string, { fplId: number; fdId: number }> = {
   "tottenham": { fplId: 18, fdId: 73 }, "spurs": { fplId: 18, fdId: 73 },
   "west ham": { fplId: 19, fdId: 563 }, "west ham united": { fplId: 19, fdId: 563 }, "hammers": { fplId: 19, fdId: 563 },
   "wolves": { fplId: 20, fdId: 76 }, "wolverhampton": { fplId: 20, fdId: 76 },
-
-  // La Liga (fplId = -1)
-  "barcelona": { fplId: -1, fdId: 81 }, "barca": { fplId: -1, fdId: 81 },
-  "real madrid": { fplId: -1, fdId: 86 },
-  "atletico madrid": { fplId: -1, fdId: 78 }, "atletico": { fplId: -1, fdId: 78 },
-  "real sociedad": { fplId: -1, fdId: 92 }, "sociedad": { fplId: -1, fdId: 92 },
-  "athletic bilbao": { fplId: -1, fdId: 77 }, "bilbao": { fplId: -1, fdId: 77 },
-  "villarreal": { fplId: -1, fdId: 94 },
-  "betis": { fplId: -1, fdId: 90 }, "real betis": { fplId: -1, fdId: 90 },
-  "sevilla": { fplId: -1, fdId: 559 },
-
-  // Bundesliga (fplId = -1)
-  "bayern munich": { fplId: -1, fdId: 5 }, "bayern": { fplId: -1, fdId: 5 },
-  "borussia dortmund": { fplId: -1, fdId: 4 }, "dortmund": { fplId: -1, fdId: 4 }, "bvb": { fplId: -1, fdId: 4 },
-  "rb leipzig": { fplId: -1, fdId: 721 }, "leipzig": { fplId: -1, fdId: 721 },
-  "bayer leverkusen": { fplId: -1, fdId: 3 }, "leverkusen": { fplId: -1, fdId: 3 },
-
-  // Serie A (fplId = -1)
-  "inter milan": { fplId: -1, fdId: 108 }, "inter": { fplId: -1, fdId: 108 },
-  "ac milan": { fplId: -1, fdId: 98 }, "milan": { fplId: -1, fdId: 98 },
-  "juventus": { fplId: -1, fdId: 109 }, "juve": { fplId: -1, fdId: 109 },
-  "napoli": { fplId: -1, fdId: 113 },
-  "roma": { fplId: -1, fdId: 100 }, "as roma": { fplId: -1, fdId: 100 },
-  "atalanta": { fplId: -1, fdId: 102 },
-  "lazio": { fplId: -1, fdId: 110 },
-
-  // Ligue 1 (fplId = -1)
-  "psg": { fplId: -1, fdId: 524 }, "paris saint-germain": { fplId: -1, fdId: 524 },
-  "marseille": { fplId: -1, fdId: 516 }, "om": { fplId: -1, fdId: 516 },
-  "lyon": { fplId: -1, fdId: 523 },
-  "monaco": { fplId: -1, fdId: 548 },
-  "lille": { fplId: -1, fdId: 521 },
 };
 
 export function getFdIdByFplId(fplId: number): number | undefined {
