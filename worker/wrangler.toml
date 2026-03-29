@@ -55,3 +55,19 @@ simple = { limit = 60, period = 60 }
 # "0 8 * * *"  = Daily 8am UTC   — prediction resolution
 [triggers]
 crons = ["0 2 * * 1", "0 8 * * *"]
+
+
+[observability]
+enabled = false
+head_sampling_rate = 1
+
+[observability.logs]
+enabled = true
+head_sampling_rate = 1
+persist = true
+invocation_logs = true
+
+[observability.traces]
+enabled = false
+persist = true
+head_sampling_rate = 1
