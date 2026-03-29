@@ -22,9 +22,9 @@ export function createRedisClient(env: Env): Redis {
  * Read from Redis cache; on miss call fetcher(), store result with TTL, return it.
  * Native Redis TTL replaces the CachedValue metadata wrapper used with KV.
  *
- * NOTE: The SET is awaited — Cloudflare Workers kill fire-and-forget promises once
- * the Response is returned (without ctx.waitUntil), so a non-awaited SET would mean
- * the cache is never populated and every request hits the cold path.
+ * Redis failures are non-fatal: if GET throws (missing credentials, network error,
+ * oversized value) we fall through to the fetcher so the app keeps working.
+ * SET failures are logged so they're visible in CF observability logs.
  */
 export async function getRedisOrFetch<T>(
   redis: Redis,
@@ -32,14 +32,24 @@ export async function getRedisOrFetch<T>(
   fetcher: () => Promise<T>,
   ttlSeconds: number
 ): Promise<T> {
-  const cached = await redis.get<T>(key);
-  if (cached !== null) return cached;
+  try {
+    const cached = await redis.get<T>(key);
+    if (cached !== null) return cached;
+  } catch (err) {
+    // Redis unavailable, bad credentials, or network error — serve uncached
+    console.warn(`[redis] GET ${key} failed, proceeding without cache:`, String(err));
+  }
 
   const data = await fetcher();
-  // Await the write — fast (<5ms) and essential; fire-and-forget is killed by CF Workers
-  await redis.set(key, data, { ex: ttlSeconds }).catch(() => {
-    // swallow write errors — a failed cache write is non-fatal
-  });
+
+  try {
+    await redis.set(key, data, { ex: ttlSeconds });
+  } catch (err) {
+    // Common causes: value exceeds Upstash REST 1MB limit (e.g. fpl:bootstrap ~4MB)
+    // Non-fatal — the assembled match-context key is small and will succeed
+    console.warn(`[redis] SET ${key} failed (value may exceed size limit):`, String(err));
+  }
+
   return data;
 }
 
