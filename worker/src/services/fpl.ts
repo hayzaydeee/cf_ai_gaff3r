@@ -303,7 +303,7 @@ export async function buildPLMatchContext(
   // Round 2: D1 + football-data.org in one parallel fan-out.
   // On a cold path this saves ~50–100ms vs the previous serial D1-then-FD approach.
   const [allFixtures, homeTeamDetails, awayTeamDetails, scorers] = await Promise.all([
-    getSeasonFixturesFromD1(env.DB, deriveSeason()),
+    getSeasonFixtures(env.DB, redis, deriveSeason()),
     canEnrich ? fetchTeamDetails(redis, env, homeFdTeamId!).catch(() => null) : Promise.resolve(null),
     canEnrich ? fetchTeamDetails(redis, env, awayFdTeamId!).catch(() => null) : Promise.resolve(null),
     canEnrich ? fetchCompetitionScorers(redis, env, 'PL').catch(() => [] as FDScorer[]) : Promise.resolve([] as FDScorer[]),
@@ -507,13 +507,16 @@ export function computeLeaguePositions(fixtures: FPLFixture[]): Map<number, numb
 }
 
 /**
- * Fetch all finished PL fixtures for the season from D1 — single query, no API fanout.
- * Replaces the old 29-call FPL parallel fetch that exceeded Upstash's 1MB REST limit.
+ * Fetch all PL fixtures for the season — D1 first (populated by weekly cron), falling back
+ * to the FPL /fixtures/ endpoint (single call, all 380 fixtures) when D1 is empty.
+ * The FPL fallback is cached in Redis at 6hr so it's only fetched once per cache window.
  */
-export async function getSeasonFixturesFromD1(
+export async function getSeasonFixtures(
   db: D1Database,
+  redis: Redis,
   season: string
 ): Promise<FPLFixture[]> {
+  // Try D1 first — fast (~50ms) once the weekly cron has run
   const { results } = await db
     .prepare(
       'SELECT home_team_id, away_team_id, home_goals, away_goals, gameweek FROM historical_results WHERE season = ? AND league = \'PL\' ORDER BY match_date ASC'
@@ -521,16 +524,25 @@ export async function getSeasonFixturesFromD1(
     .bind(season)
     .all<{ home_team_id: string; away_team_id: string; home_goals: number; away_goals: number; gameweek: number | null }>();
 
-  return results.map(row => ({
-    id: 0,
-    event: row.gameweek ?? 0,
-    team_h: Number(row.home_team_id),
-    team_a: Number(row.away_team_id),
-    team_h_score: row.home_goals,
-    team_a_score: row.away_goals,
-    finished: true,
-    kickoff_time: '',
-    team_h_difficulty: 0,
-    team_a_difficulty: 0,
-  }));
+  if (results.length > 0) {
+    return results.map(row => ({
+      id: 0,
+      event: row.gameweek ?? 0,
+      team_h: Number(row.home_team_id),
+      team_a: Number(row.away_team_id),
+      team_h_score: row.home_goals,
+      team_a_score: row.away_goals,
+      finished: true,
+      kickoff_time: '',
+      team_h_difficulty: 0,
+      team_a_difficulty: 0,
+    }));
+  }
+
+  // D1 not yet populated — fall back to FPL /fixtures/ (single call, cached 6hr)
+  return getRedisOrFetch(redis, `fpl:all-fixtures:${season}`, async () => {
+    const res = await fetch(`${FPL_BASE}/fixtures/`);
+    if (!res.ok) throw new Error(`FPL all-fixtures failed: ${res.status}`);
+    return res.json() as Promise<FPLFixture[]>;
+  }, 6 * 60 * 60);
 }
