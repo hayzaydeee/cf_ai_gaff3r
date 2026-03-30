@@ -10,7 +10,7 @@
 // 9. Return response
 
 import type { Env } from '../types/env';
-import type { ChatRequest, ChatResponse, FixtureItem } from '../types/api';
+import type { ChatRequest, ChatResponse, FixtureItem, TypedPredictionPayload } from '../types/api';
 import type { ChatMessage, Prediction, AccuracyStats, Outcome } from '../types/app';
 import { fetchMatchContext } from '../services/match-context';
 import { runAnalysis, runAnalysisStreaming } from '../services/ai';
@@ -19,7 +19,7 @@ import { log } from '../utils/logger';
 import { SYSTEM_PROMPT, buildPLUserMessage, buildStandardUserMessage } from '../prompts/gaffer';
 import { fetchFixtures, fetchBootstrap } from '../services/fpl';
 import { fetchUpcomingMatches } from '../services/football-data';
-import { identifyFixture } from '../services/fixture-matcher';
+import { identifyFixture, hasTeamMention } from '../services/fixture-matcher';
 import { runPLModel, runStandardModel, formatModelBlock, type SimResult, type ModelResult } from '../models';
 import { queryRelevantAnalyses, storeAnalysis } from '../services/vectorStore';
 import { createRedisClient } from '../services/redis';
@@ -42,6 +42,10 @@ export async function handleChat(
     return errorResponse('Missing message or gameweek', 400);
   }
 
+  // Opt B: quick sync check — no team mention + no fixture chip = general football chat.
+  // Skips the entire fixture fetch + context assembly + model + RAG pipeline.
+  const isGeneralQuery = !providedFixtureId && !hasTeamMention(message);
+
   // Get user's Durable Object
   const doId = env.USER_STATE.idFromName(userId);
   const doStub = env.USER_STATE.get(doId);
@@ -49,17 +53,21 @@ export async function handleChat(
   // Redis client — one instance for the lifetime of this request
   const redis = createRedisClient(env);
 
-  // Initialize profile
-  await doStub.fetch(new Request('http://do/init', {
-    method: 'POST',
-    body: JSON.stringify({ userId }),
-  }));
+  // Opt C: DO init dedup — skip for returning users already flagged in Redis (~20-40ms saved)
+  const alreadyInitialized = await redis.get<boolean>(`user:init:${userId}`).catch(() => false);
+  if (!alreadyInitialized) {
+    await doStub.fetch(new Request('http://do/init', {
+      method: 'POST',
+      body: JSON.stringify({ userId }),
+    }));
+    await redis.set(`user:init:${userId}`, true, { ex: 24 * 60 * 60 }).catch(() => {});
+  }
 
-  // Step 3: Parallel fetch — DO state + all upcoming fixtures for identification
+  // Step 3: Parallel fetch — DO state + upcoming fixtures (skipped for general queries, Opt B)
   const [accuracyRes, chatHistoryRes, allUpcoming] = await Promise.all([
     doStub.fetch(new Request('http://do/accuracy')),
     doStub.fetch(new Request(`http://do/chat/${gameweek}`)),
-    fetchAllUpcomingFixtures(gameweek, redis, env),
+    isGeneralQuery ? Promise.resolve([]) : fetchAllUpcomingFixtures(gameweek, redis, env),
   ]);
 
   const accuracy = await accuracyRes.json() as AccuracyStats;
@@ -106,70 +114,68 @@ export async function handleChat(
   const intent = classifyIntent(message);
   const intentHint = buildIntentHint(intent);
 
-  // Run statistical model only for result/general queries (null intent)
-  // Scorer, lineup, btts, and analyse queries don't benefit from Monte Carlo output
-  let modelBlock: string | null = null;
-  let simResult: SimResult | null = null;
-  let adjustmentNotes: string[] = [];
-  if (matchContext && shouldRunModel(intent)) {
+  // Opt A: Run statistical model and RAG in parallel — both are independent of each other.
+  // Previously sequential; parallelising saves ~100-200ms on null-intent requests.
+  const computeModel = async (): Promise<{ modelBlock: string | null; simResult: SimResult | null; adjustmentNotes: string[] }> => {
+    if (!matchContext || !shouldRunModel(intent)) return { modelBlock: null, simResult: null, adjustmentNotes: [] };
     try {
       let modelResult: ModelResult | null = null;
-
-      // Phase 5: Cache Monte Carlo results — params are stable for a given fixture+GW
-      // Saves ~500ms-1s of CPU-bound simulation on repeated requests for the same match
       if (fixtureItem) {
         const modelKey = `model:${fixtureItem.homeTeamId}:${fixtureItem.awayTeamId}:${gameweek}`;
         const cachedModel = await redis.get<ModelResult>(modelKey);
         if (cachedModel) {
           modelResult = cachedModel;
         } else {
-          if (matchContext.type === 'pl') {
-            modelResult = runPLModel(matchContext);
-          } else {
-            modelResult = runStandardModel(matchContext);
-          }
-          if (modelResult) {
-            await redis.set(modelKey, modelResult, { ex: 30 * 60 }).catch(() => {});
-          }
+          modelResult = matchContext.type === 'pl' ? runPLModel(matchContext) : runStandardModel(matchContext);
+          if (modelResult) await redis.set(modelKey, modelResult, { ex: 30 * 60 }).catch(() => {});
         }
       } else {
-        if (matchContext.type === 'pl') {
-          modelResult = runPLModel(matchContext);
-        } else {
-          modelResult = runStandardModel(matchContext);
-        }
+        modelResult = matchContext.type === 'pl' ? runPLModel(matchContext) : runStandardModel(matchContext);
       }
-
-      if (modelResult) {
-        simResult = modelResult.simResult;
-        adjustmentNotes = modelResult.adjustmentNotes;
-        modelBlock = formatModelBlock(simResult, matchContext.fixture.homeTeam, matchContext.fixture.awayTeam);
-      }
+      if (!modelResult) return { modelBlock: null, simResult: null, adjustmentNotes: [] };
+      return {
+        modelBlock: formatModelBlock(modelResult.simResult, matchContext.fixture.homeTeam, matchContext.fixture.awayTeam),
+        simResult: modelResult.simResult,
+        adjustmentNotes: modelResult.adjustmentNotes,
+      };
     } catch (err) {
       console.warn('Statistical model failed, continuing without it:', err);
+      return { modelBlock: null, simResult: null, adjustmentNotes: [] };
     }
-  }
+  };
 
-  // Query Vectorize for relevant past analyses (RAG context)
-  let ragBlock: string | null = null;
-  if (matchContext && fixtureItem) {
+  const fetchRag = async (): Promise<string | null> => {
+    if (!matchContext || !fixtureItem) return null;
     try {
-      ragBlock = await queryRelevantAnalyses(
-        env,
-        matchContext.fixture.homeTeam,
-        matchContext.fixture.awayTeam,
-        matchContext.fixture.competition,
-      );
+      return await queryRelevantAnalyses(env, matchContext.fixture.homeTeam, matchContext.fixture.awayTeam, matchContext.fixture.competition);
     } catch (err) {
       console.warn('RAG query failed, continuing without it:', err);
+      return null;
+    }
+  };
+
+  const [{ modelBlock, simResult, adjustmentNotes }, ragBlock] = await Promise.all([
+    computeModel(),
+    fetchRag(),
+  ]);
+
+  // Opt E: Check for a cached typed prediction for this fixture + intent.
+  // On hit: inject as a constraint so the LLM writes fresh narrative around the prior call.
+  let predictionConstraint: string | null = null;
+  if (fixtureItem && intent !== 'analyse') {
+    const predCacheKey = `prediction:${fixtureItem.id}:${gameweek}:${intent ?? 'result'}`;
+    const cached = await redis.get<TypedPredictionPayload>(predCacheKey).catch(() => null);
+    if (cached) {
+      predictionConstraint = `PRIOR PREDICTION (your earlier call for this fixture — embed this JSON verbatim in your PREDICTION_JSON block; write fresh narrative only):\n<<<PREDICTION_JSON>>>\n${JSON.stringify(cached)}\n<<<END_PREDICTION_JSON>>>`;
     }
   }
 
   let userPrompt: string;
   if (matchContext && matchContext.type === 'pl') {
-    userPrompt = buildPLUserMessage(matchContext, message, accuracy, modelBlock, ragBlock, intentHint || null);
+    // Opt D: pass intent so the builder can trim irrelevant context sections
+    userPrompt = buildPLUserMessage(matchContext, message, accuracy, modelBlock, ragBlock, intentHint || null, intent);
   } else if (matchContext && matchContext.type === 'standard') {
-    userPrompt = buildStandardUserMessage(matchContext, message, accuracy, modelBlock, ragBlock, intentHint || null);
+    userPrompt = buildStandardUserMessage(matchContext, message, accuracy, modelBlock, ragBlock, intentHint || null, intent);
   } else {
     // General football chat — no fixture context available
     userPrompt = `USER MESSAGE: "${message}"\n\n(No specific fixture data available. Provide general football analysis. If they're asking about a match you cannot identify, say so and offer general insights based on what you know.)`;
@@ -178,12 +184,20 @@ export async function handleChat(
     }
   }
 
+  // Prepend prediction constraint when cached (Opt E)
+  if (predictionConstraint) userPrompt = `${predictionConstraint}\n\n${userPrompt}`;
+
   // Shared post-processing: stores messages + prediction after AI response
   const runPostProcessing = async (
     cleanResponse: string,
     prediction: import('../services/ai').PredictionData | null,
-    typedPrediction: import('../types/api').TypedPredictionPayload | null = null,
+    typedPrediction: TypedPredictionPayload | null = null,
   ) => {
+    // Opt E: cache typed prediction for subsequent requests to same fixture + intent
+    if (typedPrediction && fixtureItem && intent !== 'analyse') {
+      const predCacheKey = `prediction:${fixtureItem.id}:${gameweek}:${intent ?? 'result'}`;
+      await redis.set(predCacheKey, typedPrediction, { ex: 30 * 60 }).catch(() => {});
+    }
     const userMsg: ChatMessage = {
       id: `msg_${crypto.randomUUID().slice(0, 8)}`,
       role: 'user',
@@ -274,6 +288,12 @@ export async function handleChat(
 
   // Step 7b: Non-streaming path
   const aiResult = await runAnalysis(env, SYSTEM_PROMPT, userPrompt);
+
+  // Opt E: cache typed prediction for subsequent requests to same fixture + intent
+  if (aiResult.typedPrediction && fixtureItem && intent !== 'analyse') {
+    const predCacheKey = `prediction:${fixtureItem.id}:${gameweek}:${intent ?? 'result'}`;
+    await redis.set(predCacheKey, aiResult.typedPrediction, { ex: 30 * 60 }).catch(() => {});
+  }
 
   // Step 8: Store messages in chat history
   const userMsg: ChatMessage = {
@@ -458,6 +478,10 @@ export async function handleChat(
  */
 async function fetchAllUpcomingFixtures(gameweek: number, redis: ReturnType<typeof createRedisClient>, env: Env): Promise<FixtureItem[]> {
   try {
+    // Opt F: cache the assembled fixture list (15-min TTL) \u2014 saves 3 Redis reads + assembly per request
+    const cachedUpcoming = await redis.get<FixtureItem[]>(`upcoming:${gameweek}`).catch(() => null);
+    if (cachedUpcoming) return cachedUpcoming;
+
     const [fplFixtures, bootstrap, fdMatches] = await Promise.all([
       fetchFixtures(redis, gameweek),
       fetchBootstrap(redis),
@@ -500,7 +524,9 @@ async function fetchAllUpcomingFixtures(gameweek: number, redis: ReturnType<type
         competitionCode: m.competition.code,
       }));
 
-    return [...plFixtures, ...otherFixtures];
+    const assembled = [...plFixtures, ...otherFixtures];
+    await redis.set(`upcoming:${gameweek}`, assembled, { ex: 15 * 60 }).catch(() => {});
+    return assembled;
   } catch {
     return [];
   }

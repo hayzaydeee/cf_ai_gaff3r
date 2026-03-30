@@ -136,3 +136,11 @@ function matchSingleTeam(
 function escapeRegex(s: string): string {
   return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
+
+/**
+ * Quick synchronous check: does the message mention any known team?
+ * Used to short-circuit the full fixture pipeline for general football chat queries.
+ */
+export function hasTeamMention(message: string): boolean {
+  return findTeamsInMessage(message.toLowerCase().trim()).length > 0;
+}
