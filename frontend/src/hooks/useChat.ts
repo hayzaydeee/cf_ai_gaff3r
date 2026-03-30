@@ -73,64 +73,20 @@ export function useChat(gameweek: number | null, fixtureId?: number) {
     setError(null);
 
     try {
-      // Track slot IDs for compound queries. Default: the single streamId.
-      let compoundSlotIds: string[] = [streamId];
-
       for await (const chunk of sendChatStream(trimmed, gameweek, activeFixtureId)) {
         if (chunk.type === 'meta') {
           // Received before first chunk — tells the UI whether a model block is coming
           setAllMessages(prev => prev.map(m =>
             m.id === streamId ? { ...m, hasModel: chunk.hasModel, intent: chunk.intent } : m
           ));
-        } else if (chunk.type === 'compound_meta') {
-          // Replace the single streaming placeholder with N slot placeholders
-          const slotIds = chunk.intents.map((_, i) =>
-            i === 0 ? streamId : `${streamId}_slot${i}`
-          );
-          compoundSlotIds = slotIds;
-
-          const slotMessages: import('../types').ChatMessage[] = chunk.intents.map((intentStr, i) => ({
-            id: slotIds[i],
-            role: 'assistant' as const,
-            content: '',
-            timestamp: new Date().toISOString(),
-            streaming: true,
-            intent: intentStr,
-            hasModel: intentStr === 'result',
-            compoundGroupId: streamId,
-            slotIndex: i,
-            metadata: activeFixtureId ? { fixtureId: activeFixtureId } : undefined,
-          }));
-
-          setAllMessages(prev => [
-            ...prev.filter(m => m.id !== streamId), // remove the single placeholder
-            ...slotMessages,
-          ]);
-        } else if (chunk.type === 'slot_chunk') {
-          const slotId = compoundSlotIds[chunk.slot];
-          if (slotId) {
-            setAllMessages(prev => prev.map(m =>
-              m.id === slotId ? { ...m, content: m.content + chunk.text } : m
-            ));
-          }
-        } else if (chunk.type === 'slot_done') {
-          const slotId = compoundSlotIds[chunk.slot];
-          if (slotId) {
-            setAllMessages(prev => prev.map(m =>
-              m.id === slotId
-                ? { ...m, content: chunk.response, streaming: false, prediction: chunk.prediction, simResult: chunk.simResult, adjustmentNotes: chunk.adjustmentNotes, typedPrediction: chunk.typedPrediction }
-                : m
-            ));
-            setLastAccuracy(chunk.accuracy);
-          }
         } else if (chunk.type === 'chunk') {
           setAllMessages(prev => prev.map(m =>
             m.id === streamId ? { ...m, content: m.content + chunk.text } : m
           ));
-        } else if (chunk.type === 'done') {;
+        } else if (chunk.type === 'done') {
           setAllMessages(prev => prev.map(m =>
             m.id === streamId
-              ? { ...m, content: chunk.response, streaming: false, prediction: chunk.prediction, simResult: chunk.simResult, adjustmentNotes: chunk.adjustmentNotes, typedPrediction: chunk.typedPrediction }
+              ? { ...m, content: chunk.response, streaming: false, prediction: chunk.prediction, simResult: chunk.simResult, adjustmentNotes: chunk.adjustmentNotes, typedPrediction: chunk.typedPrediction, typedPredictions: chunk.typedPredictions }
               : m
           ));
           setLastAccuracy(chunk.accuracy);

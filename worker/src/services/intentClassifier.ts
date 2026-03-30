@@ -7,9 +7,8 @@
 // Returns a specific sub-type string for everything else — model skipped.
 //
 // Compound queries: resolveIntents() returns ALL matched intents from the message.
-// classifyCompound() validates the set with a fast 8B LLM pre-pass.
-
-import type { Env } from '../types/env';
+// buildCompoundIntentHint() injects a multi-intent instruction into the single LLM prompt,
+// telling it to emit one PREDICTION_JSON block per intent type in order.
 
 export type MessageIntent = 'scorer' | 'lineup' | 'btts' | 'analyse' | null;
 
@@ -97,7 +96,7 @@ export function classifyIntent(message: string): MessageIntent {
 
 /**
  * Returns true if the Monte Carlo model should run for this intent.
- * Only result-type queries (null intent) benefit from simulation data.
+ * For compound queries, the model runs if any intent is null (result-type).
  */
 export function shouldRunModel(intent: MessageIntent): boolean {
   return intent === null; // null = result/unknown — run full pipeline
@@ -136,80 +135,23 @@ export function resolveIntents(message: string): MessageIntent[] {
 }
 
 /**
- * Use the 8B model as a fast pre-pass to validate and order a multi-intent set.
- * Only called when regex finds 2+ intents. Falls back to regex result on failure.
- * Timeout: 3.5s — if the model is slow, callers fall back to regex output.
+ * Build a compound intent instruction block to inject into the single LLM prompt.
+ * Tells the model to produce one <<<PREDICTION_JSON>>> block per intent, in order.
+ * Only called when 2+ intents are detected.
  */
-async function resolveIntentsWithLLM(message: string, env: Env): Promise<MessageIntent[]> {
-  const classify = async (): Promise<MessageIntent[]> => {
-    const result = await (env.AI as { run: Function }).run(
-      '@cf/meta/llama-3.1-8b-instruct',
-      {
-        messages: [
-          {
-            role: 'system',
-            content: 'Classify football query intents. Return JSON only: {"intents":["scorer"|"lineup"|"btts"|"analyse"|"result"]} max 3, ordered by user priority. Include "result" only if score/winner explicitly requested.',
-          },
-          { role: 'user', content: message },
-        ],
-        max_tokens: 32,
-        temperature: 0,
-      },
-    ) as { response?: string };
-
-    const text = result?.response ?? '';
-    const jsonMatch = text.match(/\{[\s\S]*\}/);
-    if (!jsonMatch) throw new Error('No JSON');
-
-    const parsed = JSON.parse(jsonMatch[0]) as { intents?: unknown };
-    if (!Array.isArray(parsed.intents)) throw new Error('No intents array');
-
-    return (parsed.intents as unknown[])
-      .slice(0, 3)
-      .map((s): MessageIntent | undefined => {
-        if (s === 'result') return null;
-        if (s === 'scorer' || s === 'lineup' || s === 'btts' || s === 'analyse') return s;
-        return undefined;
-      })
-      .filter((x): x is MessageIntent => x !== undefined)
-      .filter((x, i, arr) => arr.findIndex(v => v === x) === i); // dedupe (handles null)
+export function buildCompoundIntentHint(intents: MessageIntent[]): string {
+  const typeLabel = (intent: MessageIntent): string => {
+    if (intent === null) return 'result';
+    return intent;
   };
-
-  return Promise.race([
-    classify(),
-    new Promise<MessageIntent[]>((_, reject) => setTimeout(() => reject(new Error('timeout')), 3500)),
-  ]);
-}
-
-/**
- * Full compound intent resolver — used by chat.ts for multi-intent fan-out.
- * 1. Regex multi-scan (sync, zero cost)
- * 2. If 2+ matches: LLM pre-pass validates + orders
- * Returns { intents, isCompound } — isCompound=true triggers the parallel LLM path.
- */
-export async function classifyCompound(
-  message: string,
-  env: Env,
-): Promise<{ intents: MessageIntent[]; isCompound: boolean }> {
-  const regexIntents = resolveIntents(message);
-
-  // No explicit intents detected → single result query (default)
-  if (regexIntents.length === 0) {
-    return { intents: [null], isCompound: false };
-  }
-  // Single intent → not compound
-  if (regexIntents.length === 1) {
-    return { intents: regexIntents, isCompound: false };
-  }
-
-  // 2+ intents → LLM validates + orders
-  try {
-    const llmIntents = await resolveIntentsWithLLM(message, env);
-    // LLM must return 2+ to be treated as compound; otherwise fall back to regex
-    const validated = llmIntents.length >= 2 ? llmIntents : regexIntents;
-    return { intents: validated.slice(0, 3), isCompound: validated.length >= 2 };
-  } catch {
-    // LLM timed out or failed → trust regex
-    return { intents: regexIntents.slice(0, 3), isCompound: true };
-  }
+  const ordered = intents.slice(0, 3).map(typeLabel);
+  const lines = ordered.map((t, i) =>
+    `${i + 1}. <<<PREDICTION_JSON>>> { "type": "${t}", ... } <<<END_PREDICTION_JSON>>>`
+  );
+  return [
+    `COMPOUND QUERY DETECTED: the user is asking about multiple things (${ordered.join(', ')}).`,
+    'Emit one <<<PREDICTION_JSON>>> block per intent in this exact order:',
+    ...lines,
+    'Write all narrative first, then emit the JSON blocks at the end in sequence.',
+  ].join('\n');
 }

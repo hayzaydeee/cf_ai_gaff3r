@@ -77,10 +77,8 @@ export interface ChatMessage {
   hasModel?: boolean;
   /** Intent classified server-side before LLM call. */
   intent?: string;
-  /** Compound query tracking — identifies all bubbles from the same compound response. */
-  compoundGroupId?: string;
-  /** Which slot within a compound response this bubble represents (0-based). */
-  slotIndex?: number;
+  /** All typed prediction cards from a compound query (multiple PREDICTION_JSON blocks). */
+  typedPredictions?: TypedPrediction[];
   metadata?: {
     fixtureId?: number;
     predictionId?: string;

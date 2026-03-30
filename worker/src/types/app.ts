@@ -24,6 +24,8 @@ export interface ChatMessage {
   simResult?: import('./api').SimResultPayload;
   adjustmentNotes?: string[];
   typedPrediction?: import('./api').TypedPredictionPayload;
+  /** Multiple typed prediction cards from a compound query response. */
+  typedPredictions?: import('./api').TypedPredictionPayload[];
   metadata?: {
     fixtureId?: number;
     predictionId?: string;

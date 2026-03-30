@@ -144,6 +144,26 @@ export default function AnalysisBubble({ message, showModelBlock = true }: Analy
         <PredictionCard prediction={prediction} />
       )}
 
+      {/* ── Compound: multiple typed prediction cards from a single response ── */}
+      {!isStreaming && message.typedPredictions && message.typedPredictions.length > 0 && (
+        message.typedPredictions.map((tp, i) => (
+          <div key={i}>
+            {tp.type === 'scorer' && tp.scorers && (
+              <ScorerCard homeTeam={tp.homeTeam} awayTeam={tp.awayTeam} scorers={tp.scorers} />
+            )}
+            {tp.type === 'lineup' && (
+              <LineupGrid homeTeam={tp.homeTeam} awayTeam={tp.awayTeam} homeLineup={tp.homeLineup} awayLineup={tp.awayLineup} />
+            )}
+            {tp.type === 'btts' && (
+              <ProbabilityGauge homeTeam={tp.homeTeam} awayTeam={tp.awayTeam} btts={tp.btts} confidence={tp.confidence} overUnder={tp.overUnder} />
+            )}
+            {tp.type === 'result' && prediction && (
+              <PredictionCard prediction={prediction} />
+            )}
+          </div>
+        ))
+      )}
+
       <style>{`
         .ab-wrap {
           display: flex;
