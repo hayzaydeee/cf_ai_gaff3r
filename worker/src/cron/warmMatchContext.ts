@@ -3,7 +3,7 @@
 // so users always hit warm cache instead of the cold ~4s path.
 
 import type { Env } from '../types/env';
-import { createRedisClient } from '../services/redis';
+import { createRedisClient, mgetPipeline } from '../services/redis';
 import { fetchBootstrap, fetchFixtures, getCurrentGameweek } from '../services/fpl';
 import { fetchMatchContext } from '../services/match-context';
 import { log } from '../utils/logger';
@@ -28,11 +28,10 @@ export async function runWarmMatchContext(env: Env): Promise<void> {
     return;
   }
 
-  // Check which keys are already cached to avoid redundant work
+  // Check which keys are already cached — single pipeline HTTP request instead of N parallel EXISTS calls
   const cacheKeys = upcoming.map(f => `match-context:${f.id}:${currentGw}`);
-  const existsResults = await Promise.all(cacheKeys.map(key => redis.exists(key)));
-
-  const missing = upcoming.filter((_, i) => existsResults[i] === 0);
+  const cachedValues = await mgetPipeline(redis, cacheKeys);
+  const missing = upcoming.filter((_, i) => cachedValues[i] === null);
 
   log('cron_started', {
     gw: currentGw,

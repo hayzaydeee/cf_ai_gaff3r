@@ -61,6 +61,37 @@ export async function invalidateRedisKey(redis: Redis, key: string): Promise<voi
 }
 
 /**
+ * Fixed-window rate limiter using INCR + EXPIRE.
+ * Uses 2 Redis commands on the first request in a window, 1 command on subsequent ones.
+ * Fails open — if Redis is unavailable the request is allowed through.
+ *
+ * @param key   e.g. 'ratelimit:chat:{userId}'
+ * @param limit max requests allowed in the window
+ * @param windowSeconds rolling window duration
+ * @returns { allowed, remaining, resetInSeconds }
+ */
+export async function checkRateLimit(
+  redis: Redis,
+  key: string,
+  limit: number,
+  windowSeconds: number,
+): Promise<{ allowed: boolean; remaining: number; resetInSeconds: number }> {
+  try {
+    const count = await redis.incr(key);
+    if (count === 1) {
+      // First request in this window — stamp the expiry
+      await redis.expire(key, windowSeconds);
+    }
+    const ttl = count === 1 ? windowSeconds : await redis.ttl(key);
+    const remaining = Math.max(0, limit - count);
+    return { allowed: count <= limit, remaining, resetInSeconds: ttl };
+  } catch {
+    // Fail open — don't block users due to Redis issues
+    return { allowed: true, remaining: limit, resetInSeconds: windowSeconds };
+  }
+}
+
+/**
  * Fetch multiple keys in one pipeline round-trip (1 HTTP request instead of N).
  * Returns results in key order; null for cache misses.
  */

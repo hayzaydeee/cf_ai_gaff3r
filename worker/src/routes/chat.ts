@@ -22,7 +22,7 @@ import { fetchUpcomingMatches } from '../services/football-data';
 import { identifyFixture, hasTeamMention } from '../services/fixture-matcher';
 import { runPLModel, runStandardModel, formatModelBlock, type SimResult, type ModelResult } from '../models';
 import { queryRelevantAnalyses, storeAnalysis } from '../services/vectorStore';
-import { createRedisClient } from '../services/redis';
+import { createRedisClient, checkRateLimit } from '../services/redis';
 
 /**
  * POST /api/chat
@@ -52,6 +52,16 @@ export async function handleChat(
 
   // Redis client — one instance for the lifetime of this request
   const redis = createRedisClient(env);
+
+  // Rate limit: 20 requests per minute per user — checked before any expensive pipeline work.
+  // 2 Redis commands (INCR + conditional EXPIRE) vs. the 5-12 commands the rest of the handler uses.
+  const rl = await checkRateLimit(redis, `ratelimit:chat:${userId}`, 20, 60);
+  if (!rl.allowed) {
+    return new Response(
+      JSON.stringify({ error: 'Too many requests. Please wait before sending another message.', retryAfter: rl.resetInSeconds }),
+      { status: 429, headers: { 'Content-Type': 'application/json', 'Retry-After': String(rl.resetInSeconds) } },
+    );
+  }
 
   // Opt C: DO init dedup — skip for returning users already flagged in Redis (~20-40ms saved)
   const alreadyInitialized = await redis.get<boolean>(`user:init:${userId}`).catch(() => false);
