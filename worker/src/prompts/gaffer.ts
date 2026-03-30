@@ -188,6 +188,22 @@ export function buildPLUserMessage(
     ).join('\n')}`;
   };
 
+  const formatSquad = (team: PLMatchContext['homeTeam']): string => {
+    if (intent === 'btts' || intent === null) return '';
+    if (!team.squadPlayers?.length) return '';
+    const keyNames = new Set(team.keyPlayers.map(p => p.name));
+    const lines = team.squadPlayers.map(p => {
+      const star = keyNames.has(p.name) ? ' ★' : '';
+      const statusStr = p.status !== 'available' ? ` [${p.status}]` : '';
+      if (intent === 'lineup') {
+        return `  ${p.position} ${p.name}${star}${statusStr}`;
+      }
+      return `  ${p.position} ${p.name}${star}${statusStr} — ${p.goals}G ${p.assists}A xG:${p.xG.toFixed(1)} xA:${p.xA.toFixed(1)}`;
+    });
+    const label = intent === 'lineup' ? 'Full Squad (availability):' : 'Full Squad:';
+    return `${label}\n${lines.join('\n')}`;
+  };
+
   const formatInjuries = (team: typeof homeTeam) =>
     team.injuries.length > 0
       ? `Injuries:\n${team.injuries.map(i => `  ${i.player}: ${i.news} (${i.chanceOfPlaying ?? '?'}%)`).join('\n')}`
@@ -205,6 +221,7 @@ export function buildPLUserMessage(
     venueSuffix: string,
   ) => {
     const players = formatPlayers(team.keyPlayers);
+    const squad = formatSquad(team);
     return `\n── ${name.toUpperCase()} ──
 Position: ${team.leaguePosition}/20 (${team.points} pts, ${team.won}W ${team.drawn}D ${team.lost}L)
 Goals: ${team.goalsFor} scored, ${team.goalsAgainst} conceded (GD: ${team.goalDifference})${
@@ -212,6 +229,8 @@ Goals: ${team.goalsFor} scored, ${team.goalsAgainst} conceded (GD: ${team.goalDi
 }
 Last 5: ${team.form.join(' ')} (${team.formSummary})${
   players ? `\n${players}` : ''
+}${
+  squad ? `\n${squad}` : ''
 }
 ${formatInjuries(team)}${setPieceLine(team)}`;
   };

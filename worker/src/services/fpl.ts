@@ -111,6 +111,7 @@ export function buildPLTeamContext(
 
   // Key players: top 5 outfield players by form (exclude GKs unless exceptional)
   const keyPlayers = getKeyPlayers(teamPlayers);
+  const squadPlayers = getAllSquadPlayers(teamPlayers);
 
   // Injuries: players with status != 'a' (available)
   const injuries = getInjuries(teamPlayers);
@@ -145,8 +146,31 @@ export function buildPLTeamContext(
     formSummary,
     recentResults: recentFixtures,
     keyPlayers,
+    squadPlayers,
     injuries,
   };
+}
+
+function getAllSquadPlayers(players: FPLPlayer[]): KeyPlayer[] {
+  const posOrder: Record<number, number> = { 1: 0, 2: 1, 3: 2, 4: 3 };
+  return players
+    .filter(p => p.minutes > 0)
+    .sort((a, b) => {
+      const posDiff = (posOrder[a.element_type] ?? 4) - (posOrder[b.element_type] ?? 4);
+      if (posDiff !== 0) return posDiff;
+      return (b.goals_scored + b.assists) - (a.goals_scored + a.assists);
+    })
+    .map(p => ({
+      name: p.web_name,
+      position: POSITION_MAP[p.element_type] ?? 'UNK',
+      form: parseFloat(p.form),
+      goals: p.goals_scored,
+      assists: p.assists,
+      xG: parseFloat(p.expected_goals),
+      xA: parseFloat(p.expected_assists),
+      minutes: p.minutes,
+      status: mapPlayerStatus(p.status),
+    }));
 }
 
 function getKeyPlayers(players: FPLPlayer[]): KeyPlayer[] {
@@ -516,33 +540,48 @@ export async function getSeasonFixtures(
   redis: Redis,
   season: string
 ): Promise<FPLFixture[]> {
-  // Try D1 first — fast (~50ms) once the weekly cron has run
-  const { results } = await db
-    .prepare(
-      'SELECT home_team_id, away_team_id, home_goals, away_goals, gameweek FROM historical_results WHERE season = ? AND league = \'PL\' ORDER BY match_date ASC'
-    )
-    .bind(season)
-    .all<{ home_team_id: string; away_team_id: string; home_goals: number; away_goals: number; gameweek: number | null }>();
-
-  if (results.length > 0) {
-    return results.map(row => ({
-      id: 0,
-      event: row.gameweek ?? 0,
-      team_h: Number(row.home_team_id),
-      team_a: Number(row.away_team_id),
-      team_h_score: row.home_goals,
-      team_a_score: row.away_goals,
-      finished: true,
-      kickoff_time: '',
-      team_h_difficulty: 0,
-      team_a_difficulty: 0,
-    }));
-  }
-
-  // D1 not yet populated — fall back to FPL /fixtures/ (single call, cached 6hr)
+  // Redis-first: warm path skips D1 entirely (~50ms saved per request)
   return getRedisOrFetch(redis, `fpl:all-fixtures:${season}`, async () => {
+    // Try D1 first — fast (~50ms) once the weekly cron has run
+    const { results } = await db
+      .prepare(
+        'SELECT home_team_id, away_team_id, home_goals, away_goals, gameweek FROM historical_results WHERE season = ? AND league = \'PL\' ORDER BY match_date ASC'
+      )
+      .bind(season)
+      .all<{ home_team_id: string; away_team_id: string; home_goals: number; away_goals: number; gameweek: number | null }>();
+
+    if (results.length > 0) {
+      return results.map(row => ({
+        id: 0,
+        event: row.gameweek ?? 0,
+        team_h: Number(row.home_team_id),
+        team_a: Number(row.away_team_id),
+        team_h_score: row.home_goals,
+        team_a_score: row.away_goals,
+        finished: true,
+        kickoff_time: '',
+        team_h_difficulty: 0,
+        team_a_difficulty: 0,
+      }));
+    }
+
+    // D1 not yet populated — fall back to FPL /fixtures/ (all 380, no event param).
+    // Slim to the 10 fields we use — the raw response includes per-fixture stats arrays
+    // that push the payload to ~3MB, silently exceeding the Upstash 1MB REST limit.
     const res = await fetch(`${FPL_BASE}/fixtures/`);
     if (!res.ok) throw new Error(`FPL all-fixtures failed: ${res.status}`);
-    return res.json() as Promise<FPLFixture[]>;
+    const raw = await res.json() as Array<Record<string, unknown>>;
+    return raw.map(f => ({
+      id: f['id'] as number,
+      event: f['event'] as number,
+      team_h: f['team_h'] as number,
+      team_a: f['team_a'] as number,
+      team_h_score: f['team_h_score'] as number | null,
+      team_a_score: f['team_a_score'] as number | null,
+      finished: f['finished'] as boolean,
+      kickoff_time: f['kickoff_time'] as string,
+      team_h_difficulty: f['team_h_difficulty'] as number,
+      team_a_difficulty: f['team_a_difficulty'] as number,
+    }));
   }, 6 * 60 * 60);
 }

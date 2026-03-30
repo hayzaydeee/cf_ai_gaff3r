@@ -130,7 +130,8 @@ export interface PLTeamContext {
   form: string[];
   formSummary: string;
   recentResults: RecentResult[];
-  keyPlayers: KeyPlayer[];
+  keyPlayers: KeyPlayer[];   // top 5 by goal involvement — headline stats
+  squadPlayers: KeyPlayer[]; // full active squad — player-specific queries
   injuries: InjuryReport[];
   setPieceTakers?: string;
 }
