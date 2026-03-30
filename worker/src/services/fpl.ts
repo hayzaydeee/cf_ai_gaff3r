@@ -270,6 +270,12 @@ function computeTeamStats(teamId: number, fixtures: FPLFixture[]) {
 
 /**
  * Build the full PL match context for a fixture.
+ *
+ * I/O fan-out strategy:
+ *   Round 1 (parallel): FPL bootstrap + GW fixtures
+ *   Round 2 (parallel): D1 season fixtures + all 3 football-data.org enrichment calls
+ *     FD team IDs are derivable from FPL team IDs after Round 1, so there is no
+ *     reason to wait for D1 to complete before starting the FD HTTP calls.
  */
 export async function buildPLMatchContext(
   fixtureId: number,
@@ -289,17 +295,35 @@ export async function buildPLMatchContext(
   const awayTeam = bootstrap.teams.find(t => t.id === fixture.team_a);
   if (!homeTeam || !awayTeam) throw new Error('Teams not found in bootstrap');
 
-  // Fetch ALL fixtures for the season to compute standings + recent form
-  const allFixtures = await getSeasonFixturesFromD1(env.DB, deriveSeason());
-  const leaguePositions = computeLeaguePositions(allFixtures);
+  // FD team IDs are sync — derive now so FD calls can start alongside D1.
+  const homeFdTeamId = getFdIdByFplId(fixture.team_h) ?? getFdIdByTeamName(homeTeam.name);
+  const awayFdTeamId = getFdIdByFplId(fixture.team_a) ?? getFdIdByTeamName(awayTeam.name);
+  const canEnrich = !!(homeFdTeamId && awayFdTeamId);
 
+  // Round 2: D1 + football-data.org in one parallel fan-out.
+  // On a cold path this saves ~50–100ms vs the previous serial D1-then-FD approach.
+  const [allFixtures, homeTeamDetails, awayTeamDetails, scorers] = await Promise.all([
+    getSeasonFixturesFromD1(env.DB, deriveSeason()),
+    canEnrich ? fetchTeamDetails(redis, env, homeFdTeamId!).catch(() => null) : Promise.resolve(null),
+    canEnrich ? fetchTeamDetails(redis, env, awayFdTeamId!).catch(() => null) : Promise.resolve(null),
+    canEnrich ? fetchCompetitionScorers(redis, env, 'PL').catch(() => [] as FDScorer[]) : Promise.resolve([] as FDScorer[]),
+  ]);
+
+  const leaguePositions = computeLeaguePositions(allFixtures);
   const homeTeamContext = buildPLTeamContext(fixture.team_h, bootstrap, allFixtures, gameweek);
   const awayTeamContext = buildPLTeamContext(fixture.team_a, bootstrap, allFixtures, gameweek);
 
   homeTeamContext.leaguePosition = leaguePositions.get(fixture.team_h) ?? 0;
   awayTeamContext.leaguePosition = leaguePositions.get(fixture.team_a) ?? 0;
 
-  await enrichPLPersonnel(homeTeamContext, awayTeamContext, fixture.team_h, fixture.team_a, redis, env);
+  if (canEnrich) {
+    const homeSquad = homeTeamDetails?.squad ?? [];
+    const awaySquad = awayTeamDetails?.squad ?? [];
+    homeTeamContext.keyPlayers = selectPreferredKeyPlayers(homeTeamContext.keyPlayers, homeSquad, scorers, homeFdTeamId!);
+    awayTeamContext.keyPlayers = selectPreferredKeyPlayers(awayTeamContext.keyPlayers, awaySquad, scorers, awayFdTeamId!);
+    homeTeamContext.injuries = filterInjuriesByCurrentSquad(homeTeamContext.injuries, homeSquad);
+    awayTeamContext.injuries = filterInjuriesByCurrentSquad(awayTeamContext.injuries, awaySquad);
+  }
 
   return {
     type: 'pl',
@@ -318,47 +342,6 @@ export async function buildPLMatchContext(
     homeTeam: homeTeamContext,
     awayTeam: awayTeamContext,
   };
-}
-
-async function enrichPLPersonnel(
-  homeTeamContext: PLTeamContext,
-  awayTeamContext: PLTeamContext,
-  homeFplTeamId: number,
-  awayFplTeamId: number,
-  redis: Redis,
-  env: Env
-): Promise<void> {
-  const homeFdTeamId = getFdIdByFplId(homeFplTeamId) ?? getFdIdByTeamName(homeTeamContext.name);
-  const awayFdTeamId = getFdIdByFplId(awayFplTeamId) ?? getFdIdByTeamName(awayTeamContext.name);
-
-  if (!homeFdTeamId || !awayFdTeamId) {
-    return;
-  }
-
-  const [homeTeamDetails, awayTeamDetails, scorers] = await Promise.all([
-    fetchTeamDetails(redis, env, homeFdTeamId).catch(() => null),
-    fetchTeamDetails(redis, env, awayFdTeamId).catch(() => null),
-    fetchCompetitionScorers(redis, env, 'PL').catch(() => [] as FDScorer[]),
-  ]);
-
-  const homeSquad = homeTeamDetails?.squad ?? [];
-  const awaySquad = awayTeamDetails?.squad ?? [];
-
-  homeTeamContext.keyPlayers = selectPreferredKeyPlayers(
-    homeTeamContext.keyPlayers,
-    homeSquad,
-    scorers,
-    homeFdTeamId
-  );
-  awayTeamContext.keyPlayers = selectPreferredKeyPlayers(
-    awayTeamContext.keyPlayers,
-    awaySquad,
-    scorers,
-    awayFdTeamId
-  );
-
-  homeTeamContext.injuries = filterInjuriesByCurrentSquad(homeTeamContext.injuries, homeSquad);
-  awayTeamContext.injuries = filterInjuriesByCurrentSquad(awayTeamContext.injuries, awaySquad);
 }
 
 function normalizeName(name: string): string {

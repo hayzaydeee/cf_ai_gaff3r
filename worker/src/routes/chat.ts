@@ -203,10 +203,11 @@ export async function handleChat(
     prediction: import('../services/ai').PredictionData | null,
     typedPrediction: TypedPredictionPayload | null = null,
   ) => {
-    // Opt E: cache typed prediction for subsequent requests to same fixture + intent
+    // Opt E: cache typed prediction for subsequent requests to same fixture + intent.
+    // 6hr TTL — generated predictions don't change mid-week, so 30min was too conservative.
     if (typedPrediction && fixtureItem && intent !== 'analyse') {
       const predCacheKey = `prediction:${fixtureItem.id}:${gameweek}:${intent ?? 'result'}`;
-      await redis.set(predCacheKey, typedPrediction, { ex: 30 * 60 }).catch(() => {});
+      await redis.set(predCacheKey, typedPrediction, { ex: 6 * 60 * 60 }).catch(() => {});
     }
     const userMsg: ChatMessage = {
       id: `msg_${crypto.randomUUID().slice(0, 8)}`,
@@ -299,10 +300,11 @@ export async function handleChat(
   // Step 7b: Non-streaming path
   const aiResult = await runAnalysis(env, SYSTEM_PROMPT, userPrompt);
 
-  // Opt E: cache typed prediction for subsequent requests to same fixture + intent
+  // Opt E: cache typed prediction for subsequent requests to same fixture + intent.
+  // 6hr TTL — generated predictions don't change mid-week, so 30min was too conservative.
   if (aiResult.typedPrediction && fixtureItem && intent !== 'analyse') {
     const predCacheKey = `prediction:${fixtureItem.id}:${gameweek}:${intent ?? 'result'}`;
-    await redis.set(predCacheKey, aiResult.typedPrediction, { ex: 30 * 60 }).catch(() => {});
+    await redis.set(predCacheKey, aiResult.typedPrediction, { ex: 6 * 60 * 60 }).catch(() => {});
   }
 
   // Step 8: Store messages in chat history
