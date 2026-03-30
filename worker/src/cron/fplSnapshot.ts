@@ -6,6 +6,7 @@ import { log } from '../utils/logger';
 // 4. Upserts historical_results for finished gameweek fixtures
 
 import type { Env } from '../types/env';
+import { deriveSeason } from '../utils/season';
 
 const FPL_BASE = 'https://fantasy.premierleague.com/api';
 const POSITION_MAP: Record<number, string> = { 1: 'GK', 2: 'DEF', 3: 'MID', 4: 'FWD' };
@@ -156,15 +157,7 @@ async function fetchAllFixtures(): Promise<FPLFixture[]> {
   return res.json() as Promise<FPLFixture[]>;
 }
 
-/** Derive the current PL season string e.g. "2024-25". */
-function deriveSeason(): string {
-  const now = new Date();
-  const year = now.getFullYear();
-  const month = now.getMonth() + 1; // 1-indexed
-  // PL season starts August — if before August, we're in the previous season
-  const startYear = month >= 8 ? year : year - 1;
-  return `${startYear}-${String(startYear + 1).slice(2)}`;
-}
+
 
 /** Strip HTML and limit news field length before storing. */
 function sanitizeNews(news: string | undefined): string | null {

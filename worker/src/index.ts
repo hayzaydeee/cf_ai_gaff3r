@@ -9,6 +9,7 @@ import { handleGetStats, handleResolve } from './routes/stats';
 import { getAuth, getSessionUserId } from './auth';
 import { runFplSnapshot } from './cron/fplSnapshot';
 import { runResolvePredictions } from './cron/resolvePredictions';
+import { runWarmMatchContext } from './cron/warmMatchContext';
 import { isPromptInjection, sanitiseInput } from './utils/security';
 import { log } from './utils/logger';
 
@@ -50,6 +51,7 @@ export default {
   async scheduled(controller: ScheduledController, env: Env): Promise<void> {
     const cronName = controller.cron === '0 2 * * 1' ? 'fpl_snapshot'
       : controller.cron === '0 8 * * *' ? 'resolve_predictions'
+      : controller.cron === '0 * * * *' ? 'warm_match_context'
       : 'unknown';
     log('cron_started', { cron: controller.cron, name: cronName });
     try {
@@ -57,6 +59,8 @@ export default {
         await runFplSnapshot(env);
       } else if (controller.cron === '0 8 * * *') {
         await runResolvePredictions(env);
+      } else if (controller.cron === '0 * * * *') {
+        await runWarmMatchContext(env);
       } else {
         log('cron_started', { cron: controller.cron, name: 'unknown' }, 'warn');
       }

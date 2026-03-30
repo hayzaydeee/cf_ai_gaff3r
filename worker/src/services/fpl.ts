@@ -10,6 +10,7 @@ import { getRedisOrFetch } from './cache';
 import type { Redis } from './redis';
 import { fetchCompetitionScorers, fetchTeamDetails } from './football-data';
 import { getFdIdByFplId, getFdIdByTeamName } from '../utils/team-aliases';
+import { deriveSeason } from '../utils/season';
 
 const FPL_BASE = 'https://fantasy.premierleague.com/api';
 
@@ -263,7 +264,7 @@ export async function buildPLMatchContext(
   if (!homeTeam || !awayTeam) throw new Error('Teams not found in bootstrap');
 
   // Fetch ALL fixtures for the season to compute standings + recent form
-  const allFixtures = await getAllSeasonFixtures(redis, bootstrap.events);
+  const allFixtures = await getSeasonFixturesFromD1(env.DB, deriveSeason());
   const leaguePositions = computeLeaguePositions(allFixtures);
 
   const homeTeamContext = buildPLTeamContext(fixture.team_h, bootstrap, allFixtures, gameweek);
@@ -497,17 +498,30 @@ export function computeLeaguePositions(fixtures: FPLFixture[]): Map<number, numb
 }
 
 /**
- * Fetch all finished fixtures across the season for standings computation.
- * Aggregated into a single cache key keyed by current GW to avoid N KV reads per request.
+ * Fetch all finished PL fixtures for the season from D1 — single query, no API fanout.
+ * Replaces the old 29-call FPL parallel fetch that exceeded Upstash's 1MB REST limit.
  */
-async function getAllSeasonFixtures(redis: Redis, events: FPLEvent[]): Promise<FPLFixture[]> {
-  const relevantGWs = events.filter(e => e.finished || e.is_current);
-  if (relevantGWs.length === 0) return [];
+export async function getSeasonFixturesFromD1(
+  db: D1Database,
+  season: string
+): Promise<FPLFixture[]> {
+  const { results } = await db
+    .prepare(
+      'SELECT home_team_id, away_team_id, home_goals, away_goals, gameweek FROM historical_results WHERE season = ? AND league = \'PL\' ORDER BY match_date ASC'
+    )
+    .bind(season)
+    .all<{ home_team_id: string; away_team_id: string; home_goals: number; away_goals: number; gameweek: number | null }>();
 
-  // Single aggregated cache key — invalidates naturally when latestGW advances
-  const latestGW = Math.max(...relevantGWs.map(e => e.id));
-  return getRedisOrFetch(redis, `fpl:fixtures:season:${latestGW}`, async () => {
-    const results = await Promise.all(relevantGWs.map(e => fetchFixtures(redis, e.id)));
-    return results.flat();
-  }, BOOTSTRAP_TTL);
+  return results.map(row => ({
+    id: 0,
+    event: row.gameweek ?? 0,
+    team_h: Number(row.home_team_id),
+    team_a: Number(row.away_team_id),
+    team_h_score: row.home_goals,
+    team_a_score: row.away_goals,
+    finished: true,
+    kickoff_time: '',
+    team_h_difficulty: 0,
+    team_a_difficulty: 0,
+  }));
 }

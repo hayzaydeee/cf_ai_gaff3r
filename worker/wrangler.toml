@@ -50,7 +50,7 @@ simple = { limit = 60, period = 60 }
 # "0 2 * * 1"  = Monday 2am UTC  — weekly FPL snapshot + Dixon-Coles re-fit
 # "0 8 * * *"  = Daily 8am UTC   — prediction resolution
 [triggers]
-crons = ["0 2 * * 1", "0 8 * * *"]
+crons = ["0 2 * * 1", "0 8 * * *", "0 * * * *"]
 
 
 [observability]
