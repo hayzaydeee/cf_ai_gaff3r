@@ -13,8 +13,8 @@ import type { Env } from '../types/env';
 import type { ChatRequest, ChatResponse, FixtureItem, TypedPredictionPayload } from '../types/api';
 import type { ChatMessage, Prediction, AccuracyStats, Outcome } from '../types/app';
 import { fetchMatchContext } from '../services/match-context';
-import { runAnalysis, runAnalysisStreaming } from '../services/ai';
-import { classifyIntent, shouldRunModel, buildIntentHint } from '../services/intentClassifier';
+import { runAnalysis, runAnalysisStreaming, runCompoundStreaming, type CompoundSlot } from '../services/ai';
+import { classifyIntent, shouldRunModel, buildIntentHint, resolveIntents, classifyCompound } from '../services/intentClassifier';
 import { log } from '../utils/logger';
 import { SYSTEM_PROMPT, buildPLUserMessage, buildStandardUserMessage } from '../prompts/gaffer';
 import { fetchFixtures, fetchBootstrap } from '../services/fpl';
@@ -124,10 +124,16 @@ export async function handleChat(
   const intent = classifyIntent(message);
   const intentHint = buildIntentHint(intent);
 
+  // Quick sync multi-intent scan: determines if model should run even when the
+  // first-match intent (used on the single-intent path) would suppress it.
+  // e.g. "predict the score AND who scores?" → regex sees null+scorer → model runs.
+  const quickIntents = resolveIntents(message);
+  const mightHaveResultSlot = quickIntents.length === 0 || quickIntents.includes(null) || intent === null;
+
   // Opt A: Run statistical model and RAG in parallel — both are independent of each other.
   // Previously sequential; parallelising saves ~100-200ms on null-intent requests.
-  const computeModel = async (): Promise<{ modelBlock: string | null; simResult: SimResult | null; adjustmentNotes: string[] }> => {
-    if (!matchContext || !shouldRunModel(intent)) return { modelBlock: null, simResult: null, adjustmentNotes: [] };
+  const computeModel = async (run = mightHaveResultSlot): Promise<{ modelBlock: string | null; simResult: SimResult | null; adjustmentNotes: string[] }> => {
+    if (!matchContext || !run) return { modelBlock: null, simResult: null, adjustmentNotes: [] };
     try {
       let modelResult: ModelResult | null = null;
       if (fixtureItem) {
@@ -164,12 +170,17 @@ export async function handleChat(
     }
   };
 
-  const [{ modelBlock, simResult, adjustmentNotes }, ragBlock] = await Promise.all([
+  const [{ modelBlock, simResult, adjustmentNotes }, ragBlock, compoundResult] = await Promise.all([
     computeModel(),
     fetchRag(),
+    // Compound detection runs in parallel with model+RAG — only for streaming fixture queries
+    wantsStream && matchContext
+      ? classifyCompound(message, env)
+      : Promise.resolve({ intents: quickIntents.length ? quickIntents : [intent], isCompound: false }),
   ]);
 
-  // Opt E: Check for a cached typed prediction for this fixture + intent.
+  const isCompound = compoundResult.isCompound && wantsStream && !!matchContext;
+
   // On hit: inject as a constraint so the LLM writes fresh narrative around the prior call.
   let predictionConstraint: string | null = null;
   if (fixtureItem && intent !== 'analyse') {
@@ -276,7 +287,103 @@ export async function handleChat(
     }
   };
 
-  // Step 7a: Streaming path — return SSE stream, post-processing runs inside it
+  const SSE_HEADERS = {
+    'Content-Type': 'text/event-stream',
+    'Cache-Control': 'no-cache, no-transform',
+    'X-Accel-Buffering': 'no',
+  };
+
+  // Step 7a-compound: Parallel LLM fan-out for multi-intent queries.
+  // Only activates when classifyCompound detects 2+ intents in a streaming fixture query.
+  if (isCompound) {
+    // Store the user message once, before any slots run (slots only store assistant messages).
+    const compoundUserMsg: ChatMessage = {
+      id: `msg_${crypto.randomUUID().slice(0, 8)}`,
+      role: 'user',
+      content: message,
+      timestamp: new Date().toISOString(),
+      metadata: resolvedFixtureId ? { fixtureId: resolvedFixtureId } : undefined,
+    };
+    await doStub.fetch(new Request(`http://do/chat/${gameweek}`, { method: 'POST', body: JSON.stringify(compoundUserMsg) }));
+
+    const sharedExtraDone = {
+      accuracy: { totalPredictions: accuracy.totalPredictions, outcomeAccuracy: accuracy.outcomeAccuracy, currentStreak: accuracy.currentStreak },
+      fixtureFound: !!matchContext,
+      dataSource: matchContext ? (matchContext.type === 'pl' ? 'fpl' : 'football-data') : null,
+      identifiedFixture: fixtureItem ? { id: fixtureItem.id, homeTeam: fixtureItem.homeTeam, awayTeam: fixtureItem.awayTeam, kickoffTime: fixtureItem.kickoffTime, competition: fixtureItem.competition, competitionCode: resolvedCompetitionCode } : null,
+    };
+
+    // Build one CompoundSlot per detected intent.
+    const slots: CompoundSlot[] = await Promise.all(compoundResult.intents.map(async (slotIntent) => {
+      // Slot-specific prediction constraint lookup
+      let slotConstraint: string | null = null;
+      if (fixtureItem && slotIntent !== 'analyse') {
+        const predCacheKey = `prediction:${fixtureItem.id}:${gameweek}:${slotIntent ?? 'result'}`;
+        const cached = await redis.get<TypedPredictionPayload>(predCacheKey).catch(() => null);
+        if (cached) {
+          slotConstraint = `PRIOR PREDICTION (embed verbatim):\n<<<PREDICTION_JSON>>>\n${JSON.stringify(cached)}\n<<<END_PREDICTION_JSON>>>`;
+        }
+      }
+
+      // Only the null (result) slot gets model data — other intents don't use simulation
+      const slotModelBlock = slotIntent === null ? modelBlock : null;
+      const slotSimResult = slotIntent === null ? simResult : null;
+      const slotAdjNotes = slotIntent === null ? adjustmentNotes : [];
+
+      let slotUserPrompt: string;
+      if (matchContext && matchContext.type === 'pl') {
+        slotUserPrompt = buildPLUserMessage(matchContext, message, accuracy, slotModelBlock, ragBlock, buildIntentHint(slotIntent), slotIntent);
+      } else if (matchContext && matchContext.type === 'standard') {
+        slotUserPrompt = buildStandardUserMessage(matchContext, message, accuracy, slotModelBlock, ragBlock, buildIntentHint(slotIntent), slotIntent);
+      } else {
+        slotUserPrompt = userPrompt; // general fallback
+      }
+      if (slotConstraint) slotUserPrompt = `${slotConstraint}\n\n${slotUserPrompt}`;
+
+      const slotExtraDone = {
+        ...sharedExtraDone,
+        simResult: slotSimResult ?? undefined,
+        adjustmentNotes: slotAdjNotes.length > 0 ? slotAdjNotes : undefined,
+        intent: slotIntent ?? 'result',
+      };
+
+      const slotOnComplete = async (
+        cleanResponse: string,
+        prediction: import('../services/ai').PredictionData | null,
+        typedPrediction: TypedPredictionPayload | null,
+      ) => {
+        // Cache typed prediction per slot
+        if (typedPrediction && fixtureItem && slotIntent !== 'analyse') {
+          const predCacheKey = `prediction:${fixtureItem.id}:${gameweek}:${slotIntent ?? 'result'}`;
+          await redis.set(predCacheKey, typedPrediction, { ex: 6 * 60 * 60 }).catch(() => {});
+        }
+
+        const assistantMsg: ChatMessage = {
+          id: `msg_${crypto.randomUUID().slice(0, 8)}`,
+          role: 'assistant',
+          content: cleanResponse,
+          timestamp: new Date().toISOString(),
+          typedPrediction: typedPrediction ?? undefined,
+          simResult: (slotIntent === null && slotSimResult) ? slotSimResult : undefined,
+          adjustmentNotes: slotAdjNotes.length > 0 ? slotAdjNotes : undefined,
+          metadata: resolvedFixtureId ? { fixtureId: resolvedFixtureId } : undefined,
+        };
+        await doStub.fetch(new Request(`http://do/chat/${gameweek}`, { method: 'POST', body: JSON.stringify(assistantMsg) }));
+
+        // D1 prediction insert only for result-type slots (same logic as single-intent path)
+        if (prediction && slotIntent === null && matchContext && resolvedFixtureId && fixtureItem) {
+          await runPostProcessing(cleanResponse, prediction, typedPrediction);
+        }
+      };
+
+      return { userPrompt: slotUserPrompt, intent: slotIntent, extraDoneData: slotExtraDone, onComplete: slotOnComplete };
+    }));
+
+    const streamBody = await runCompoundStreaming(slots, SYSTEM_PROMPT, env, ctx);
+    return new Response(streamBody, { headers: SSE_HEADERS });
+  }
+
+  // Step 7a: Streaming path (single intent) — return SSE stream, post-processing runs inside it
   if (wantsStream) {
     const extraDone = {
       accuracy: { totalPredictions: accuracy.totalPredictions, outcomeAccuracy: accuracy.outcomeAccuracy, currentStreak: accuracy.currentStreak },
@@ -289,11 +396,7 @@ export async function handleChat(
     const streamMeta = { hasModel: shouldRunModel(intent), intent: intent ?? 'result' };
     const streamBody = await runAnalysisStreaming(env, SYSTEM_PROMPT, userPrompt, extraDone, runPostProcessing, streamMeta, ctx);
     return new Response(streamBody, {
-      headers: {
-        'Content-Type': 'text/event-stream',
-        'Cache-Control': 'no-cache, no-transform',
-        'X-Accel-Buffering': 'no',
-      },
+      headers: SSE_HEADERS,
     });
   }
 

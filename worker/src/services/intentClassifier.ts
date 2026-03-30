@@ -5,10 +5,27 @@
 //
 // Returns null for result/general queries — full pipeline runs.
 // Returns a specific sub-type string for everything else — model skipped.
+//
+// Compound queries: resolveIntents() returns ALL matched intents from the message.
+// classifyCompound() validates the set with a fast 8B LLM pre-pass.
+
+import type { Env } from '../types/env';
 
 export type MessageIntent = 'scorer' | 'lineup' | 'btts' | 'analyse' | null;
 
 // null = run full result prediction pipeline (default for general / "who you got" queries)
+
+// Explicit result/score prediction patterns — only used for compound detection.
+// `classifyIntent` returns null (result) as the fallback; these are for detecting
+// "predict the score AND who scores" style cross-intent queries.
+const RESULT_PATTERNS = [
+  /\bpredict\b.{0,20}\b(result|scoreline)\b/i,
+  /\bpredict\b.{0,5}\bscore\b(?!r)/i,   // "predict the score" but not "predict scorer"
+  /\bfinal\s+score\b/i,
+  /\bwho.{0,10}(will\s+)?(win|prevail)\b/i,
+  /\bwho\s+(do\s+you\s+)?got\b/i,
+  /\bwhat.{0,10}\bresult\b/i,
+];
 
 const SCORER_PATTERNS = [
   /\bwho.{0,25}(will\s+)?score\b/i,
@@ -99,4 +116,100 @@ export function buildIntentHint(intent: MessageIntent): string {
     analyse: 'DETECTED INTENT: analyse — respond using ANALYSE mode. No PREDICTION_JSON block.',
   };
   return map[intent];
+}
+
+/**
+ * Scan the message for ALL matching intents (not first-match).
+ * Used for compound query detection — returns every intent whose patterns fire.
+ * An empty array means no specific intent detected → default to result (null).
+ * Note: null (result) is only returned when RESULT_PATTERNS explicitly matches,
+ * so single-intent "who will score?" returns ['scorer'], not ['scorer', null].
+ */
+export function resolveIntents(message: string): MessageIntent[] {
+  const found: MessageIntent[] = [];
+  if (RESULT_PATTERNS.some(p => p.test(message))) found.push(null);
+  if (SCORER_PATTERNS.some(p => p.test(message)))  found.push('scorer');
+  if (LINEUP_PATTERNS.some(p => p.test(message)))  found.push('lineup');
+  if (BTTS_PATTERNS.some(p => p.test(message)))    found.push('btts');
+  if (ANALYSE_PATTERNS.some(p => p.test(message))) found.push('analyse');
+  return found;
+}
+
+/**
+ * Use the 8B model as a fast pre-pass to validate and order a multi-intent set.
+ * Only called when regex finds 2+ intents. Falls back to regex result on failure.
+ * Timeout: 3.5s — if the model is slow, callers fall back to regex output.
+ */
+async function resolveIntentsWithLLM(message: string, env: Env): Promise<MessageIntent[]> {
+  const classify = async (): Promise<MessageIntent[]> => {
+    const result = await (env.AI as { run: Function }).run(
+      '@cf/meta/llama-3.1-8b-instruct',
+      {
+        messages: [
+          {
+            role: 'system',
+            content: 'Classify football query intents. Return JSON only: {"intents":["scorer"|"lineup"|"btts"|"analyse"|"result"]} max 3, ordered by user priority. Include "result" only if score/winner explicitly requested.',
+          },
+          { role: 'user', content: message },
+        ],
+        max_tokens: 32,
+        temperature: 0,
+      },
+    ) as { response?: string };
+
+    const text = result?.response ?? '';
+    const jsonMatch = text.match(/\{[\s\S]*\}/);
+    if (!jsonMatch) throw new Error('No JSON');
+
+    const parsed = JSON.parse(jsonMatch[0]) as { intents?: unknown };
+    if (!Array.isArray(parsed.intents)) throw new Error('No intents array');
+
+    return (parsed.intents as unknown[])
+      .slice(0, 3)
+      .map((s): MessageIntent | undefined => {
+        if (s === 'result') return null;
+        if (s === 'scorer' || s === 'lineup' || s === 'btts' || s === 'analyse') return s;
+        return undefined;
+      })
+      .filter((x): x is MessageIntent => x !== undefined)
+      .filter((x, i, arr) => arr.findIndex(v => v === x) === i); // dedupe (handles null)
+  };
+
+  return Promise.race([
+    classify(),
+    new Promise<MessageIntent[]>((_, reject) => setTimeout(() => reject(new Error('timeout')), 3500)),
+  ]);
+}
+
+/**
+ * Full compound intent resolver — used by chat.ts for multi-intent fan-out.
+ * 1. Regex multi-scan (sync, zero cost)
+ * 2. If 2+ matches: LLM pre-pass validates + orders
+ * Returns { intents, isCompound } — isCompound=true triggers the parallel LLM path.
+ */
+export async function classifyCompound(
+  message: string,
+  env: Env,
+): Promise<{ intents: MessageIntent[]; isCompound: boolean }> {
+  const regexIntents = resolveIntents(message);
+
+  // No explicit intents detected → single result query (default)
+  if (regexIntents.length === 0) {
+    return { intents: [null], isCompound: false };
+  }
+  // Single intent → not compound
+  if (regexIntents.length === 1) {
+    return { intents: regexIntents, isCompound: false };
+  }
+
+  // 2+ intents → LLM validates + orders
+  try {
+    const llmIntents = await resolveIntentsWithLLM(message, env);
+    // LLM must return 2+ to be treated as compound; otherwise fall back to regex
+    const validated = llmIntents.length >= 2 ? llmIntents : regexIntents;
+    return { intents: validated.slice(0, 3), isCompound: validated.length >= 2 };
+  } catch {
+    // LLM timed out or failed → trust regex
+    return { intents: regexIntents.slice(0, 3), isCompound: true };
+  }
 }

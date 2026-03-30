@@ -178,7 +178,11 @@ export type ChatStreamChunk =
   | { type: 'meta'; hasModel: boolean; intent: string }
   | { type: 'chunk'; text: string }
   | { type: 'done'; response: string; prediction: ChatResponseData['prediction']; accuracy: ChatResponseData['accuracy']; fixtureFound: boolean; identifiedFixture: ChatResponseData['identifiedFixture']; simResult?: SimResult; adjustmentNotes?: string[]; typedPrediction?: TypedPrediction }
-  | { type: 'error'; error: string };
+  | { type: 'error'; error: string }
+  // Compound query events — one compound_meta followed by N pairs of slot_chunk/slot_done
+  | { type: 'compound_meta'; slots: number; intents: string[] }
+  | { type: 'slot_chunk'; slot: number; text: string }
+  | { type: 'slot_done'; slot: number; response: string; prediction: ChatResponseData['prediction']; accuracy: ChatResponseData['accuracy']; fixtureFound: boolean; identifiedFixture: ChatResponseData['identifiedFixture']; simResult?: SimResult; adjustmentNotes?: string[]; typedPrediction?: TypedPrediction; intent?: string };
 
 /**
  * POST /api/chat with stream:true — yields SSE chunks as they arrive.

@@ -343,6 +343,148 @@ export async function runAnalysisStreaming(
   });
 }
 
+// ── Compound query streaming ──────────────────────────────────────────────────
+
+export interface CompoundSlot {
+  /** Per-slot user prompt (built with the slot's own intent). */
+  userPrompt: string;
+  /** Intent for this slot — null = result prediction. */
+  intent: import('../services/intentClassifier').MessageIntent;
+  /** Merged into the slot_done event alongside the AI response. */
+  extraDoneData: Record<string, unknown>;
+  /** Post-processing callback (DO writes, D1 insert, etc.) */
+  onComplete: (
+    response: string,
+    prediction: PredictionData | null,
+    typedPrediction: TypedPredictionPayload | null,
+  ) => Promise<void>;
+}
+
+/**
+ * Run N LLM calls in parallel, merging all slots into a single SSE stream.
+ *
+ * SSE protocol:
+ *   1. { type: 'compound_meta', slots: N, intents: string[] }
+ *   2. { type: 'slot_chunk', slot: i, text: string }  (many, out-of-order across slots)
+ *   3. { type: 'slot_done',  slot: i, response, typedPrediction, ... }  (one per slot)
+ *
+ * Slots stream in parallel — the fastest responding slot emits first.
+ * The frontend uses `slot` index to route chunks to the correct bubble.
+ */
+export async function runCompoundStreaming(
+  slots: CompoundSlot[],
+  systemPrompt: string,
+  env: Env,
+  ctx?: ExecutionContext,
+): Promise<ReadableStream<Uint8Array>> {
+  const encoder = new TextEncoder();
+  const { readable, writable } = new TransformStream<Uint8Array, Uint8Array>();
+  const writer = writable.getWriter();
+
+  const emit = (data: Record<string, unknown>): Promise<void> =>
+    writer.write(encoder.encode(`data: ${JSON.stringify(data)}\n\n`));
+
+  const processAllSlots = async () => {
+    await emit({
+      type: 'compound_meta',
+      slots: slots.length,
+      intents: slots.map(s => s.intent ?? 'result'),
+    });
+
+    await Promise.all(slots.map(async (slot, slotIndex) => {
+      let aiStream: ReadableStream<Uint8Array>;
+      try {
+        aiStream = await env.AI.run(
+          PRIMARY_MODEL as Parameters<typeof env.AI.run>[0],
+          {
+            messages: [
+              { role: 'system', content: systemPrompt },
+              { role: 'user', content: slot.userPrompt },
+            ],
+            max_tokens: 1024,
+            temperature: 0.7,
+            stream: true,
+          } as Parameters<typeof env.AI.run>[1],
+          { gateway: { id: GATEWAY_ID } },
+        ) as ReadableStream<Uint8Array>;
+      } catch (err) {
+        await emit({ type: 'slot_done', slot: slotIndex, response: '', prediction: null, typedPrediction: null, error: String(err), ...slot.extraDoneData });
+        return;
+      }
+
+      const reader = aiStream.getReader();
+      const decoder = new TextDecoder();
+      let sseBuffer = '';
+      let accumulated = '';
+
+      try {
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+
+          sseBuffer += decoder.decode(value, { stream: true });
+          const lines = sseBuffer.split('\n');
+          sseBuffer = lines.pop() ?? '';
+
+          for (const line of lines) {
+            const trimmed = line.trim();
+            if (!trimmed.startsWith('data:')) continue;
+            const raw = trimmed.slice(5).trim();
+            if (raw === '[DONE]') continue;
+            try {
+              const parsed = JSON.parse(raw);
+              const text: string = parsed.response ?? '';
+              if (text) {
+                accumulated += text;
+                await emit({ type: 'slot_chunk', slot: slotIndex, text });
+              }
+            } catch { /* skip malformed chunk */ }
+          }
+        }
+      } catch (err) {
+        console.error(`Compound slot ${slotIndex} stream read error:`, err);
+      } finally {
+        reader.releaseLock();
+      }
+
+      const typedPrediction = extractTypedPrediction(accumulated);
+      const prediction = typedPredictionToPredictionData(typedPrediction) ?? extractPrediction(accumulated);
+      const cleanResponse = accumulated
+        .replace(/<<<PREDICTION_JSON>>>[\s\S]*?<<<END_PREDICTION_JSON>>>/g, '')
+        .trim();
+
+      const isResultType = !typedPrediction || typedPrediction.type === 'result';
+      const { simResult: simData, adjustmentNotes: adjNotes, ...restExtraDone } = slot.extraDoneData;
+
+      await emit({
+        type: 'slot_done',
+        slot: slotIndex,
+        response: cleanResponse,
+        prediction,
+        typedPrediction,
+        ...(isResultType ? { simResult: simData, adjustmentNotes: adjNotes } : {}),
+        ...restExtraDone,
+      });
+
+      const postProcess = slot.onComplete(cleanResponse, prediction, typedPrediction).catch(err => {
+        console.warn(`Compound slot ${slotIndex} onComplete failed:`, err);
+      });
+      if (ctx) ctx.waitUntil(postProcess);
+      else await postProcess;
+    }));
+
+    writer.close();
+  };
+
+  const allDone = processAllSlots().catch(err => {
+    console.error('Compound streaming error:', err);
+    writer.abort(err);
+  });
+  if (ctx) ctx.waitUntil(allDone);
+
+  return readable;
+}
+
 /**
  * Generate a text embedding using the BGE-small model via AI Gateway.
  * Returns a 768-dimension float array, or null on failure.
