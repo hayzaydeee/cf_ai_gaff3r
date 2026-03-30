@@ -2,7 +2,7 @@
 
 > Chat with a sharp, opinionated gaffer about any upcoming Premier League match. Get data-backed predictions, track your accuracy, and build a history of footballing insight.
 
-**Live:** [gaff3r.com](https://gaff3r.com)
+**Live:** [gaff3r.com](https://gaff3r.xyz)
 
 ---
 
