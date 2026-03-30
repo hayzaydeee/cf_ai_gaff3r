@@ -45,8 +45,9 @@ export async function getRedisOrFetch<T>(
   try {
     await redis.set(key, data, { ex: ttlSeconds });
   } catch (err) {
-    // Common causes: value exceeds Upstash REST 1MB limit (e.g. fpl:bootstrap ~4MB)
-    // Non-fatal — the assembled match-context key is small and will succeed
+    // SET failures are non-fatal but indicate a problem worth investigating.
+    // Common cause: value exceeds Upstash REST 1MB limit.
+    // fpl:bootstrap is slimmed before storage (~150KB) and should always succeed.
     console.warn(`[redis] SET ${key} failed (value may exceed size limit):`, String(err));
   }
 

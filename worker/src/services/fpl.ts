@@ -20,13 +20,39 @@ const FIXTURES_TTL = 6 * 60 * 60;     // 6 hours — finished GW fixture data ne
 
 /**
  * Fetch the bootstrap-static endpoint (teams, players, events).
- * This is the main FPL data source — ~4MB raw, cached aggressively.
+ * The raw FPL response is ~4MB (700 players × 60+ fields). We slim the elements
+ * array to only the fields our code uses — reducing to ~150KB — so it fits within
+ * Upstash's 1MB REST limit and actually gets cached.
  */
 export async function fetchBootstrap(redis: Redis): Promise<FPLBootstrapResponse> {
   return getRedisOrFetch(redis, 'fpl:bootstrap', async () => {
     const res = await fetch(`${FPL_BASE}/bootstrap-static/`);
     if (!res.ok) throw new Error(`FPL bootstrap failed: ${res.status}`);
-    return res.json() as Promise<FPLBootstrapResponse>;
+    const raw = await res.json() as FPLBootstrapResponse;
+    return {
+      events: raw.events,
+      teams: raw.teams,
+      elements: raw.elements.map(p => ({
+        id: p.id,
+        web_name: p.web_name,
+        team: p.team,
+        element_type: p.element_type,
+        status: p.status,
+        chance_of_playing_next_round: p.chance_of_playing_next_round,
+        form: p.form,
+        goals_scored: p.goals_scored,
+        assists: p.assists,
+        clean_sheets: p.clean_sheets,
+        expected_goals: p.expected_goals,
+        expected_assists: p.expected_assists,
+        expected_goal_involvements: p.expected_goal_involvements,
+        news: p.news,
+        minutes: p.minutes,
+        influence: p.influence,
+        creativity: p.creativity,
+        threat: p.threat,
+      })),
+    };
   }, BOOTSTRAP_TTL);
 }
 
