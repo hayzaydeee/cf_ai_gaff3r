@@ -133,22 +133,38 @@ export async function getRedisOrFetchSWR<T>(
   ctx?: { waitUntil: (promise: Promise<unknown>) => void },
 ): Promise<T> {
   try {
-    const envelope = await redis.get<SWREnvelope<T>>(key);
-    if (envelope?.data !== undefined && envelope?.cachedAt) {
-      const ageMs = Date.now() - envelope.cachedAt;
-      if (ageMs < softTtlSeconds * 1000) {
-        // Hot path — data is fresh
+    const raw = await redis.get<SWREnvelope<T> | T>(key);
+    if (raw !== null && raw !== undefined) {
+      // Detect SWR envelope vs legacy (pre-SWR) cached value.
+      // Legacy values are bare T objects without a `cachedAt` property.
+      const isEnvelope = typeof raw === 'object' && 'cachedAt' in (raw as Record<string, unknown>);
+
+      if (isEnvelope) {
+        const envelope = raw as SWREnvelope<T>;
+        const ageMs = Date.now() - envelope.cachedAt;
+        if (ageMs < softTtlSeconds * 1000) {
+          // Hot path — data is fresh
+          return envelope.data;
+        }
+        // Stale but within hard TTL — serve stale, revalidate in background
+        if (ctx) {
+          ctx.waitUntil(
+            fetcher().then(fresh =>
+              redis.set(key, { data: fresh, cachedAt: Date.now() } satisfies SWREnvelope<T>, { ex: hardTtlSeconds }).catch(() => {})
+            ).catch(() => {})
+          );
+        }
         return envelope.data;
       }
-      // Stale but within hard TTL — serve stale, revalidate in background
+
+      // Legacy format — return the value as-is and upgrade to SWR envelope in background
+      const legacyData = raw as T;
       if (ctx) {
         ctx.waitUntil(
-          fetcher().then(fresh =>
-            redis.set(key, { data: fresh, cachedAt: Date.now() } satisfies SWREnvelope<T>, { ex: hardTtlSeconds }).catch(() => {})
-          ).catch(() => {})
+          redis.set(key, { data: legacyData, cachedAt: Date.now() } satisfies SWREnvelope<T>, { ex: hardTtlSeconds }).catch(() => {})
         );
       }
-      return envelope.data;
+      return legacyData;
     }
   } catch {
     // Redis unavailable — fall through to fetcher

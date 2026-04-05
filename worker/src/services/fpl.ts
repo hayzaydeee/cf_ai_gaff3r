@@ -309,11 +309,13 @@ export async function buildPLMatchContext(
   env: Env
 ): Promise<PLMatchContext> {
   // Round 1: all three fetches are independent — maximise parallelism.
+  const r1Start = Date.now();
   const [bootstrap, gwFixtures, allFixtures] = await Promise.all([
-    fetchBootstrap(redis),
-    fetchFixtures(redis, gameweek),
-    getSeasonFixtures(env.DB, redis, deriveSeason()),
+    fetchBootstrap(redis).then(r => { console.log(`[perf] fetchBootstrap: ${Date.now() - r1Start}ms`); return r; }),
+    fetchFixtures(redis, gameweek).then(r => { console.log(`[perf] fetchFixtures: ${Date.now() - r1Start}ms`); return r; }),
+    getSeasonFixtures(env.DB, redis, deriveSeason()).then(r => { console.log(`[perf] getSeasonFixtures: ${Date.now() - r1Start}ms`); return r; }),
   ]);
+  console.log(`[perf] Round 1 total: ${Date.now() - r1Start}ms`);
 
   const fixture = gwFixtures.find(f => f.id === fixtureId);
   if (!fixture) throw new Error(`Fixture ${fixtureId} not found in GW ${gameweek}`);
@@ -328,11 +330,13 @@ export async function buildPLMatchContext(
   const canEnrich = !!(homeFdTeamId && awayFdTeamId);
 
   // Round 2: football-data.org enrichment only.
+  const r2Start = Date.now();
   const [homeTeamDetails, awayTeamDetails, scorers] = await Promise.all([
-    canEnrich ? fetchTeamDetails(redis, env, homeFdTeamId!).catch(() => null) : Promise.resolve(null),
-    canEnrich ? fetchTeamDetails(redis, env, awayFdTeamId!).catch(() => null) : Promise.resolve(null),
-    canEnrich ? fetchCompetitionScorers(redis, env, 'PL').catch(() => [] as FDScorer[]) : Promise.resolve([] as FDScorer[]),
+    canEnrich ? fetchTeamDetails(redis, env, homeFdTeamId!).then(r => { console.log(`[perf] fetchTeamDetails(home): ${Date.now() - r2Start}ms`); return r; }).catch(() => null) : Promise.resolve(null),
+    canEnrich ? fetchTeamDetails(redis, env, awayFdTeamId!).then(r => { console.log(`[perf] fetchTeamDetails(away): ${Date.now() - r2Start}ms`); return r; }).catch(() => null) : Promise.resolve(null),
+    canEnrich ? fetchCompetitionScorers(redis, env, 'PL').then(r => { console.log(`[perf] fetchCompetitionScorers: ${Date.now() - r2Start}ms`); return r; }).catch(() => [] as FDScorer[]) : Promise.resolve([] as FDScorer[]),
   ]);
+  console.log(`[perf] Round 2 total: ${Date.now() - r2Start}ms`);
 
   const leaguePositions = computeLeaguePositions(allFixtures);
   const homeTeamContext = buildPLTeamContext(fixture.team_h, bootstrap, allFixtures, gameweek);
