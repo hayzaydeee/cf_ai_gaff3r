@@ -51,7 +51,7 @@ PROMPT 8
 "i've provided club logos within /assets. create appropriate hooks and team mappings, either by name or id to fetch them for rendering within the app, wherever the clubs are referenced. make sure the sizing is suitable, and the mappings for retrieval have different fallbacks, i.e if name, shortname or id isnt available from FPL data, we fall back on football-data.org responses"
 
 
-PROMPT 9 (session 2026-03-16)
+PROMPT 9 
 
 "❯ tell me                                                                                                                                                                                                                                                                                                                                                                                                                                                                           05:13 AM                                                                                                                                                                                                                                  ⚽                                                                                                                                                                                                                                        **The Gaffer's Call**: I think Arsenal's got the edge in this one, but it's not gonna be a walkover. **Form Check**: Arsenal's been in great form, with 4 wins and 1 draw in their last 5 matches, and they're playing at home, which     should give them an advantage. **The Key Factor**: The statistical model gives Arsenal a 53% chance of winning, which is a decent margin, but Bournemouth's recent run of 5 draws in a row suggests they're tough to beat.
 **Prediction:** Arsenal 1–1 Bournemouth: Confidence: Medium **Where I Could Be Wrong**: If Bournemouth can finally turn one of those draws into a win, it could be a big upset.
@@ -148,7 +148,6 @@ PROMPT 11
   1. Premium lineup visual — FotMob/Sofascore-style pitch with players positioned in formation. Needs full squad data (FPL only gives key players). Would require a separate squad roster source or manual data layer.
   2. Custom AI-generated visuals (Approach 2) — VISUAL_JSON registry is scaffolded. Needs: first registered component types (radar, comparison_bar, form_chart), system prompt additions, worker-side VISUAL_JSON parsing. This is the V2 
   differentiator.
-  3. Approach 3 intent classifier — Two-pass LLM pipeline for edge cases. Marked V3. Needs baseline misfire rate data from V1 first.
   4. Substitution predictions — "Who do you think comes on?" as a PREDICT:subs sub-type. Needs injury + minutes data which FPL partially provides.
   5. Player-level predictions — "Will Salah score and assist?" as a combined prop. Would need a PlayerProp component and JSON schema.
 
@@ -336,6 +335,12 @@ Key difference: the v1 block had `homeScore`, `awayScore`, `confidence`, `reason
 **File:** `worker/src/prompts/gaffer.ts` — `buildPLUserMessage()`
 **Used when:** fixture is a PL match (competitionCode `'PL'`).
 **Injects:** FPL strength ratings, key player xG/xA/form, injury reports, set piece takers, Dixon-Coles model output block, RAG context block, user track record.
+**Intent-aware trimming:** The template adapts based on the classified intent:
+- `result` / `null` — full context (FPL difficulty, strength ratings, key player stats, set pieces)
+- `scorer` — includes full squad with xG/xA, omits FPL difficulty/strength
+- `lineup` — includes full squad with availability status, omits FPL difficulty/strength and set pieces
+- `btts` — omits individual player stats and full squad (aggregate goal stats suffice)
+- `analyse` — full context
 
 ```
 USER MESSAGE: "${userMessage}"
@@ -404,15 +409,20 @@ Total: ${totalPredictions} | Outcome: ${outcomeAccuracy}% | Streak: ${currentStr
 
 ### PREDICTION EXTRACTION
 
-**File:** `worker/src/services/ai.ts` — `extractTypedPrediction()` + `extractPrediction()`
+**File:** `worker/src/services/ai.ts` — `extractAllTypedPredictions()` + `extractPrediction()`
 
-The Gaffer embeds a `<<<PREDICTION_JSON>>>` block inline within PREDICT mode responses. This eliminates a second LLM call. The Worker extracts via regex:
+The Gaffer embeds `<<<PREDICTION_JSON>>>` blocks inline within PREDICT mode responses. This eliminates a second LLM call. The Worker extracts via regex:
 
 ```
-/<<<PREDICTION_JSON>>>([\s\S]*?)<<<END_PREDICTION_JSON>>>/
+/<<<PREDICTION_JSON>>>(\[\s\S\]*?)<<<END_PREDICTION_JSON>>>/g
 ```
 
-`extractTypedPrediction()` reads the `type` field and validates the appropriate sub-type schema. Returns a `TypedPredictionPayload` covering all four sub-types. For backward compatibility, `extractPrediction()` derives a flat `PredictionData` when `type === 'result'` — used for D1 storage and accuracy tracking. Scorer, lineup, and BTTS types are persisted to Durable Object chat history but not the D1 `predictions` table (no accuracy resolution for non-result markets in V1).
+`extractAllTypedPredictions()` finds **all** prediction blocks in the response (compound queries can emit multiple). Each block's `type` field is read and validated against the appropriate sub-type schema. Returns `TypedPredictionPayload[]`. For backward compatibility, `extractPrediction()` derives a flat `PredictionData` when `type === 'result'` — used for D1 storage and accuracy tracking. Scorer, lineup, and BTTS types are persisted to Durable Object chat history but not the D1 `predictions` table (no accuracy resolution for non-result markets in V1).
+
+**Models:**
+- Primary: `@cf/meta/llama-3.3-70b-instruct-fp8-fast`
+- Fallback: `@cf/meta/llama-3.1-8b-instruct` (used when primary fails)
+- Embeddings: `@cf/baai/bge-base-en-v1.5` (used for Vectorize RAG)
 
 ---
 
