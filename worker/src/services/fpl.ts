@@ -329,14 +329,21 @@ export async function buildPLMatchContext(
   const awayFdTeamId = getFdIdByFplId(fixture.team_a) ?? getFdIdByTeamName(awayTeam.name);
   const canEnrich = !!(homeFdTeamId && awayFdTeamId);
 
-  // Round 2: football-data.org enrichment only.
+  // Round 2: football-data.org enrichment — best-effort with 3s timeout.
+  // FD API routinely takes 10–20s on cold starts. The FPL-only context from Round 1
+  // is already complete (form, standings, key players, injuries). FD enrichment only
+  // refines key player selection and filters injuries by current squad — nice-to-have.
+  const FD_TIMEOUT_MS = 3_000;
+  const withTimeout = <T>(p: Promise<T>, fallback: T): Promise<T> =>
+    Promise.race([p, new Promise<T>(resolve => setTimeout(() => resolve(fallback), FD_TIMEOUT_MS))]);
+
   const r2Start = Date.now();
   const [homeTeamDetails, awayTeamDetails, scorers] = await Promise.all([
-    canEnrich ? fetchTeamDetails(redis, env, homeFdTeamId!).then(r => { console.log(`[perf] fetchTeamDetails(home): ${Date.now() - r2Start}ms`); return r; }).catch(() => null) : Promise.resolve(null),
-    canEnrich ? fetchTeamDetails(redis, env, awayFdTeamId!).then(r => { console.log(`[perf] fetchTeamDetails(away): ${Date.now() - r2Start}ms`); return r; }).catch(() => null) : Promise.resolve(null),
-    canEnrich ? fetchCompetitionScorers(redis, env, 'PL').then(r => { console.log(`[perf] fetchCompetitionScorers: ${Date.now() - r2Start}ms`); return r; }).catch(() => [] as FDScorer[]) : Promise.resolve([] as FDScorer[]),
+    canEnrich ? withTimeout(fetchTeamDetails(redis, env, homeFdTeamId!), null).catch(() => null) : Promise.resolve(null),
+    canEnrich ? withTimeout(fetchTeamDetails(redis, env, awayFdTeamId!), null).catch(() => null) : Promise.resolve(null),
+    canEnrich ? withTimeout(fetchCompetitionScorers(redis, env, 'PL'), [] as FDScorer[]).catch(() => [] as FDScorer[]) : Promise.resolve([] as FDScorer[]),
   ]);
-  console.log(`[perf] Round 2 total: ${Date.now() - r2Start}ms`);
+  console.log(`[perf] Round 2 total: ${Date.now() - r2Start}ms (enriched: ${!!(homeTeamDetails || awayTeamDetails)})`);
 
   const leaguePositions = computeLeaguePositions(allFixtures);
   const homeTeamContext = buildPLTeamContext(fixture.team_h, bootstrap, allFixtures, gameweek);
