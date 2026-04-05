@@ -76,63 +76,9 @@ All match data comes from the **Fantasy Premier League (FPL) API** — no API ke
 
 ---
 
-## Running Locally
+## Try It
 
-### Prerequisites
-
-- [Node.js](https://nodejs.org/) v18+
-- [Wrangler CLI](https://developers.cloudflare.com/workers/wrangler/) (`npm i -g wrangler`)
-- A Cloudflare account (free tier is sufficient)
-
-### Setup
-
-```bash
-# Clone the repo
-git clone https://github.com/hayzaydeee/cf_ai_gaff3r.git
-cd cf_ai_gaff3r
-
-# Install dependencies
-cd worker && npm install && cd ..
-cd frontend && npm install && cd ..
-
-# Authenticate with Cloudflare (required for Workers AI + Durable Objects)
-wrangler login
-
-# Create the KV namespace
-cd worker
-wrangler kv namespace create FPL_CACHE
-# Copy the output ID into wrangler.toml → [[kv_namespaces]] → id
-```
-
-### Run the Backend
-
-```bash
-cd worker
-npm run dev
-# Worker starts at http://localhost:8787
-```
-
-### Run the Frontend
-
-```bash
-# In a separate terminal
-cd frontend
-npm run dev
-# App starts at http://localhost:5173
-# API calls proxy to localhost:8787 automatically
-```
-
-### Deploy
-
-```bash
-# Deploy the Worker
-cd worker
-npm run deploy
-
-# Deploy the frontend (connect repo to Cloudflare Pages via dashboard)
-# Build command: cd frontend && npm run build
-# Output directory: frontend/dist
-```
+Gaff3r is live at **[gaff3r.xyz](https://gaff3r.xyz)** — no setup required.
 
 ---
 
