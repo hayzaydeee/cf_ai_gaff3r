@@ -132,7 +132,7 @@ export default {
       }
 
       if (path === '/api/match-context' && request.method === 'GET') {
-        response = await handleGetMatchContext(request, env);
+        response = await handleGetMatchContext(request, env, ctx);
         return secured(response, origin);
       }
 

@@ -296,10 +296,11 @@ function computeTeamStats(teamId: number, fixtures: FPLFixture[]) {
  * Build the full PL match context for a fixture.
  *
  * I/O fan-out strategy:
- *   Round 1 (parallel): FPL bootstrap + GW fixtures
- *   Round 2 (parallel): D1 season fixtures + all 3 football-data.org enrichment calls
- *     FD team IDs are derivable from FPL team IDs after Round 1, so there is no
- *     reason to wait for D1 to complete before starting the FD HTTP calls.
+ *   Round 1 (parallel): FPL bootstrap + GW fixtures + season fixtures (D1/FPL)
+ *     getSeasonFixtures has zero dependency on bootstrap or GW fixtures — running
+ *     it here saves 2–4s on cold paths vs the previous Round-2 placement.
+ *   Round 2 (parallel): football-data.org enrichment (team details + scorers)
+ *     Needs FPL team IDs from Round 1 to derive FD team IDs.
  */
 export async function buildPLMatchContext(
   fixtureId: number,
@@ -307,9 +308,11 @@ export async function buildPLMatchContext(
   redis: Redis,
   env: Env
 ): Promise<PLMatchContext> {
-  const [bootstrap, gwFixtures] = await Promise.all([
+  // Round 1: all three fetches are independent — maximise parallelism.
+  const [bootstrap, gwFixtures, allFixtures] = await Promise.all([
     fetchBootstrap(redis),
     fetchFixtures(redis, gameweek),
+    getSeasonFixtures(env.DB, redis, deriveSeason()),
   ]);
 
   const fixture = gwFixtures.find(f => f.id === fixtureId);
@@ -319,15 +322,13 @@ export async function buildPLMatchContext(
   const awayTeam = bootstrap.teams.find(t => t.id === fixture.team_a);
   if (!homeTeam || !awayTeam) throw new Error('Teams not found in bootstrap');
 
-  // FD team IDs are sync — derive now so FD calls can start alongside D1.
+  // FD team IDs are sync — derive now so FD calls can start immediately.
   const homeFdTeamId = getFdIdByFplId(fixture.team_h) ?? getFdIdByTeamName(homeTeam.name);
   const awayFdTeamId = getFdIdByFplId(fixture.team_a) ?? getFdIdByTeamName(awayTeam.name);
   const canEnrich = !!(homeFdTeamId && awayFdTeamId);
 
-  // Round 2: D1 + football-data.org in one parallel fan-out.
-  // On a cold path this saves ~50–100ms vs the previous serial D1-then-FD approach.
-  const [allFixtures, homeTeamDetails, awayTeamDetails, scorers] = await Promise.all([
-    getSeasonFixtures(env.DB, redis, deriveSeason()),
+  // Round 2: football-data.org enrichment only.
+  const [homeTeamDetails, awayTeamDetails, scorers] = await Promise.all([
     canEnrich ? fetchTeamDetails(redis, env, homeFdTeamId!).catch(() => null) : Promise.resolve(null),
     canEnrich ? fetchTeamDetails(redis, env, awayFdTeamId!).catch(() => null) : Promise.resolve(null),
     canEnrich ? fetchCompetitionScorers(redis, env, 'PL').catch(() => [] as FDScorer[]) : Promise.resolve([] as FDScorer[]),

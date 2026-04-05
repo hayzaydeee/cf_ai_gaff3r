@@ -6,17 +6,24 @@ import type { MatchContext } from '../types/app';
 import type { Env } from '../types/env';
 import { buildPLMatchContext } from './fpl';
 import { buildStandardMatchContext, fetchUpcomingMatches } from './football-data';
-import { getRedisOrFetch } from './cache';
+import { getRedisOrFetchSWR } from './redis';
 import type { Redis } from './redis';
 import type { FDMatch } from '../types/football-data';
 
-// Assembled match context TTL — 30 min (the shortest of any component)
-const CONTEXT_TTL = 30 * 60;
+// Assembled match context TTL — 60 min.
+// The hourly warm cron refreshes before this expires, eliminating cold gaps.
+// Soft TTL (50 min) triggers background revalidation via SWR so users never wait.
+const CONTEXT_SOFT_TTL = 50 * 60;  // 50 min — serve fresh
+const CONTEXT_HARD_TTL = 90 * 60;  // 90 min — serve stale + revalidate in background
 
 /**
  * Determine the data source and build the appropriate match context.
  * The fully assembled context is cached as a single Redis key, collapsing up to
  * 6 downstream API/cache reads into a single GET on cache hits.
+ *
+ * Uses stale-while-revalidate: within 50 min → instant. Between 50–90 min →
+ * instant (stale) + background refresh via ctx.waitUntil(). Beyond 90 min →
+ * synchronous rebuild (cold path).
  *
  * For PL fixtures: uses FPL API (rich data — player xG, injuries, strength, FDR)
  * For everything else: uses football-data.org (standings, form, recent results)
@@ -26,11 +33,12 @@ export async function fetchMatchContext(
   fixtureId: number,
   gameweek: number,
   redis: Redis,
-  env: Env
+  env: Env,
+  ctx?: ExecutionContext,
 ): Promise<MatchContext> {
   const cacheKey = `match-context:${fixtureId}:${gameweek}`;
 
-  return getRedisOrFetch(redis, cacheKey, async () => {
+  return getRedisOrFetchSWR(redis, cacheKey, async () => {
     if (competitionCode === 'PL') {
       return buildPLMatchContext(fixtureId, gameweek, redis, env);
     } else {
@@ -41,7 +49,7 @@ export async function fetchMatchContext(
       }
       return buildStandardMatchContext(match, redis, env);
     }
-  }, CONTEXT_TTL);
+  }, CONTEXT_SOFT_TTL, CONTEXT_HARD_TTL, ctx);
 }
 
 /**

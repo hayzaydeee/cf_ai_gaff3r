@@ -4,25 +4,55 @@
 
 import type { Env } from '../types/env';
 import { createRedisClient, mgetPipeline } from '../services/redis';
-import { fetchBootstrap, fetchFixtures, getCurrentGameweek } from '../services/fpl';
+import { fetchBootstrap, fetchFixtures, getSeasonFixtures, getCurrentGameweek } from '../services/fpl';
+import { fetchCompetitionScorers, fetchTeamDetails } from '../services/football-data';
 import { fetchMatchContext } from '../services/match-context';
+import { getFdIdByFplId, getFdIdByTeamName } from '../utils/team-aliases';
+import { deriveSeason } from '../utils/season';
 import { log } from '../utils/logger';
 
 export async function runWarmMatchContext(env: Env): Promise<void> {
   const redis = createRedisClient(env);
 
-  // Fetch bootstrap + current GW
-  const [, gwInfo] = await Promise.all([
+  // ── Pre-warm shared dependency keys ────────────────────────────────
+  // These have 1–6h TTLs. When warm, each is a single Redis GET (~1 command).
+  // When cold, the fetcher fires and caches the result — all subsequent
+  // fixture builds in this cron run (and user requests) hit warm cache.
+  const [bootstrap, gwInfo] = await Promise.all([
     fetchBootstrap(redis),
     getCurrentGameweek(redis),
   ]);
   const currentGw = gwInfo.current;
 
-  const gwFixtures = await fetchFixtures(redis, currentGw);
+  const [gwFixtures] = await Promise.all([
+    fetchFixtures(redis, currentGw),
+    // Season fixtures (D1 → FPL fallback) and PL scorers — warm in parallel.
+    // These are the two slowest cold calls and have independent cache keys.
+    getSeasonFixtures(env.DB, redis, deriveSeason()),
+    fetchCompetitionScorers(redis, env, 'PL').catch(() => []),
+  ]);
 
-  // Only upcoming (not yet finished) PL fixtures in this GW need warming
+  // Pre-warm FD team detail keys for all upcoming fixture teams.
+  // Only 20 PL teams exist — deduplication avoids redundant fetches.
   const upcoming = gwFixtures.filter(f => !f.finished);
 
+  if (upcoming.length > 0) {
+    const fdTeamIds = new Set<number>();
+    for (const f of upcoming) {
+      const homeTeam = bootstrap.teams.find(t => t.id === f.team_h);
+      const awayTeam = bootstrap.teams.find(t => t.id === f.team_a);
+      const homeFd = getFdIdByFplId(f.team_h) ?? (homeTeam ? getFdIdByTeamName(homeTeam.name) : undefined);
+      const awayFd = getFdIdByFplId(f.team_a) ?? (awayTeam ? getFdIdByTeamName(awayTeam.name) : undefined);
+      if (homeFd) fdTeamIds.add(homeFd);
+      if (awayFd) fdTeamIds.add(awayFd);
+    }
+    // Parallel fan-out — each call is a Redis GET on hit, HTTP+SET on miss.
+    await Promise.allSettled(
+      [...fdTeamIds].map(id => fetchTeamDetails(redis, env, id))
+    );
+  }
+
+  // ── Warm individual match-context keys ─────────────────────────────
   if (upcoming.length === 0) {
     log('cron_completed', { gw: currentGw, warmed: 0, message: 'No upcoming fixtures' });
     return;

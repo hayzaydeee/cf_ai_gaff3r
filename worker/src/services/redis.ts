@@ -105,3 +105,61 @@ export async function mgetPipeline<T>(redis: Redis, keys: string[]): Promise<(T 
   const results = await pipeline.exec();
   return results as (T | null)[];
 }
+
+// ── Stale-While-Revalidate cache ──────────────────────────────────────
+
+interface SWREnvelope<T> {
+  data: T;
+  cachedAt: number; // epoch ms
+}
+
+/**
+ * Stale-while-revalidate cache wrapper.
+ *
+ * - Within softTTL: return cached data immediately (hot path — 1 Redis GET).
+ * - Between softTTL and hardTTL: return stale data AND kick off a background
+ *   revalidation via ctx.waitUntil() so the next request is fresh.
+ * - Beyond hardTTL or no data: fetch synchronously (cold path — same as getRedisOrFetch).
+ *
+ * Same Redis command count as getRedisOrFetch — only changes WHEN the SET fires.
+ * The envelope adds ~30 bytes overhead per stored value.
+ */
+export async function getRedisOrFetchSWR<T>(
+  redis: Redis,
+  key: string,
+  fetcher: () => Promise<T>,
+  softTtlSeconds: number,
+  hardTtlSeconds: number,
+  ctx?: { waitUntil: (promise: Promise<unknown>) => void },
+): Promise<T> {
+  try {
+    const envelope = await redis.get<SWREnvelope<T>>(key);
+    if (envelope?.data !== undefined && envelope?.cachedAt) {
+      const ageMs = Date.now() - envelope.cachedAt;
+      if (ageMs < softTtlSeconds * 1000) {
+        // Hot path — data is fresh
+        return envelope.data;
+      }
+      // Stale but within hard TTL — serve stale, revalidate in background
+      if (ctx) {
+        ctx.waitUntil(
+          fetcher().then(fresh =>
+            redis.set(key, { data: fresh, cachedAt: Date.now() } satisfies SWREnvelope<T>, { ex: hardTtlSeconds }).catch(() => {})
+          ).catch(() => {})
+        );
+      }
+      return envelope.data;
+    }
+  } catch {
+    // Redis unavailable — fall through to fetcher
+  }
+
+  // Cold path — no cached data (or past hard TTL / Redis failure)
+  const data = await fetcher();
+  try {
+    await redis.set(key, { data, cachedAt: Date.now() } satisfies SWREnvelope<T>, { ex: hardTtlSeconds });
+  } catch {
+    // SET failure is non-fatal
+  }
+  return data;
+}

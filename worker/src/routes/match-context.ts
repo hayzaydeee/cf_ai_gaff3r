@@ -3,7 +3,7 @@ import type { MatchContextResponse } from '../types/api';
 import { fetchMatchContext } from '../services/match-context';
 import { createRedisClient } from '../services/redis';
 
-export async function handleGetMatchContext(request: Request, env: Env): Promise<Response> {
+export async function handleGetMatchContext(request: Request, env: Env, ctx?: ExecutionContext): Promise<Response> {
   const url = new URL(request.url);
   const fixtureId = Number.parseInt(url.searchParams.get('fixtureId') ?? '', 10);
   const gameweek = Number.parseInt(url.searchParams.get('gameweek') ?? '', 10);
@@ -21,7 +21,8 @@ export async function handleGetMatchContext(request: Request, env: Env): Promise
     fixtureId,
     gameweek,
     createRedisClient(env),
-    env
+    env,
+    ctx,
   );
 
   const response: MatchContextResponse = context.type === 'pl'
