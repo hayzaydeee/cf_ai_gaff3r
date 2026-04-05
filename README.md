@@ -2,7 +2,7 @@
 
 > Chat with a sharp, opinionated gaffer about any upcoming Premier League match. Get data-backed predictions, track your accuracy, and build a history of footballing insight.
 
-**Live:** [gaff3r.com](https://gaff3r.xyz)
+**Live:** [gaff3r.xyz](https://gaff3r.xyz)
 
 ---
 
@@ -27,19 +27,23 @@ Every prediction is tracked. As real results come in, your accuracy is measured 
 ```
 Browser ──► Cloudflare Pages (React + Vite + Tailwind v4)
                 │
-                ├─ GET /api/gameweek/current
-                ├─ GET /api/fixtures/:gw
                 ├─ POST /api/chat
-                ├─ GET /api/predictions
-                └─ GET /api/stats
+                ├─ GET  /api/fixtures/:gw
+                ├─ GET  /api/match-context/:id
+                ├─ GET  /api/predictions
+                ├─ GET  /api/stats
+                └─ POST /api/auth/*
                 │
                 ▼
          Cloudflare Worker (Orchestrator)
                 │
                 ├─► Workers AI (Llama 3.3 70B) ─── Match analysis + prediction
-                ├─► Durable Object (per user) ──── Chat history, predictions, accuracy
-                ├─► Workers KV (cache) ─────────── FPL data (bootstrap, fixtures)
-                └─► FPL API ────────────────────── Teams, players, injuries, GW data
+                ├─► D1 (SQLite) ────────────────── Teams, fixtures, auth tables
+                ├─► Durable Object (per user) ──── Chat history, user state
+                ├─► Vectorize ──────────────────── Analysis RAG (768-dim cosine)
+                ├─► Upstash Redis ──────────────── FPL data cache
+                ├─► FPL API ────────────────────── Teams, players, injuries, GW data
+                └─► Cron Triggers ──────────────── FPL snapshots, prediction resolution
 ```
 
 ### Cloudflare Component Mapping
@@ -47,9 +51,13 @@ Browser ──► Cloudflare Pages (React + Vite + Tailwind v4)
 | Requirement | Component | How It's Used |
 |-------------|-----------|---------------|
 | **LLM** | Workers AI | `@cf/meta/llama-3.3-70b-instruct-fp8-fast` generates match analysis with inline structured predictions |
-| **Workflow / Coordination** | Worker | 7-step orchestration pipeline: parse → parallel fetch (DO + KV + FPL) → prompt build → LLM → parse prediction → store → respond |
-| **User Input (Chat)** | Pages | 4-page React SPA — Hub, Chat, Predictions, Stats — with responsive navigation |
-| **Memory / State** | Durable Objects | Per-user state split by gameweek: `profile`, `accuracy`, `gw:N:chat`, `gw:N:predictions` |
+| **Workflow / Coordination** | Worker | Orchestration pipeline: parse → fetch context (D1 + Redis + FPL) → statistical models → prompt build → LLM → parse prediction → store → respond |
+| **User Input (Chat)** | Pages | React SPA — Landing, Hub, Chat, Predictions, Stats, Studio — with responsive navigation |
+| **Memory / State** | Durable Objects | Per-user chat history and session state |
+| **Database** | D1 + Kysely | Teams, fixtures, auth tables (Better Auth) |
+| **Vector Search** | Vectorize | RAG over past analyses for contextual grounding |
+| **Cache** | Upstash Redis | FPL API response caching |
+| **Statistical Models** | Worker | Dixon-Coles, Monte Carlo simulation, contextual adjustments |
 
 ### Data Source
 
@@ -65,11 +73,15 @@ All match data comes from the **Fantasy Premier League (FPL) API** — no API ke
 
 | Layer | Technology |
 |-------|------------|
-| Frontend | React 19, Vite 6, Tailwind CSS v4, React Router 7 |
-| Backend | Cloudflare Worker (TypeScript) |
+| Frontend | React 19, Vite 6, Tailwind CSS v4, React Router 7, Recharts, Framer Motion |
+| Backend | Cloudflare Worker (TypeScript), Kysely (query builder) |
 | AI | Cloudflare Workers AI — Llama 3.3 70B Instruct |
+| Auth | Better Auth |
+| Database | Cloudflare D1 (SQLite) |
 | State | Cloudflare Durable Objects (per-user, GW-keyed) |
-| Cache | Cloudflare Workers KV |
+| Vector Search | Cloudflare Vectorize (768-dim, cosine) |
+| Cache | Upstash Redis |
+| Email | SendGrid |
 | Hosting | Cloudflare Pages |
 | Data | FPL API (fantasy.premierleague.com) |
 | Fonts | EB Garamond (serif body) + League Spartan (sans-serif headings) |
@@ -89,22 +101,30 @@ cf_ai_gaff3r/
 ├── worker/                     # Cloudflare Worker backend
 │   ├── src/
 │   │   ├── index.ts            # Entry point + router
-│   │   ├── routes/             # API endpoint handlers
-│   │   ├── services/           # FPL client, AI wrapper, KV cache
+│   │   ├── auth.ts             # Better Auth config
+│   │   ├── routes/             # API endpoint handlers (chat, fixtures, predictions, stats, match-context)
+│   │   ├── services/           # FPL client, AI wrapper, Redis cache, vector store, intent classifier
+│   │   ├── models/             # Dixon-Coles, Monte Carlo, contextual adjustments
+│   │   ├── cron/               # Scheduled jobs (FPL snapshot, prediction resolution, match context warming)
+│   │   ├── db/                 # D1 schema (Kysely)
 │   │   ├── durable-objects/    # UserState DO class
+│   │   ├── security/           # Rate limiting, input validation
 │   │   ├── prompts/            # Gaffer system prompt + templates
+│   │   ├── utils/              # Logger, team aliases, season helpers
 │   │   └── types/              # TypeScript type definitions
-│   └── wrangler.toml           # Cloudflare config (DO, KV, AI bindings)
+│   ├── migrations/             # D1 SQL migrations
+│   └── wrangler.toml           # Cloudflare config (DO, D1, AI, Vectorize bindings)
 ├── frontend/                   # React SPA (Cloudflare Pages)
 │   ├── src/
-│   │   ├── pages/              # Hub, Chat, Predictions, Stats
+│   │   ├── pages/              # Landing, Hub, Chat, Predictions, Stats, Studio, Auth
 │   │   ├── components/         # UI components by feature area
-│   │   ├── hooks/              # useTheme, useGameweek, useChat
+│   │   ├── hooks/              # useTheme, useGameweek, useChat, useClubLogo
+│   │   ├── context/            # AuthContext
 │   │   ├── services/           # Backend API client
+│   │   ├── lib/                # Auth client
 │   │   └── index.css           # Tailwind v4 theme + dark mode
 │   └── vite.config.ts          # Vite + Tailwind + API proxy
-├── docs/
-│   └── gaffer_prd.md           # Product Requirements Document
+├── docs/                       # PRD, ideation backlog, implementation plans
 ├── PROMPTS.md                  # All AI prompts documented
 └── README.md
 ```
@@ -138,7 +158,6 @@ Warm, editorial aesthetic inspired by football magazine design:
 ## Future Improvements
 
 - **Streaming responses** — progressive AI output for better perceived performance
-- **Auto-resolution via Cron Triggers** — resolve predictions without user action
 - **Champions League support** — extend beyond PL using additional data sources
 - **Comparison mode** — user vs AI prediction tracking
 - **Shareable prediction cards** — social media-ready OG images
