@@ -2,6 +2,7 @@
 // Renders: text section cards → model output block → typed prediction card
 
 import type { ChatMessage } from '../../types';
+import { normalizeSimResult } from '../../utils/simResult';
 import { parseAssistantSections } from './MessageBubble';
 import PredictionCard from './PredictionCard';
 import ScorerCard from './ScorerCard';
@@ -37,7 +38,10 @@ function stripPredictionBlock(content: string): string {
 }
 
 export default function AnalysisBubble({ message, showModelBlock = true }: AnalysisBubbleProps) {
-  const { simResult, adjustmentNotes, prediction, typedPrediction } = message;
+  const { adjustmentNotes, prediction, typedPrediction } = message;
+  // Drop sections the model couldn't produce usable numbers for rather than rendering
+  // placeholders (or crashing on a null λ/μ that arrived as JSON `null`).
+  const sim = normalizeSimResult(message.simResult);
   const isStreaming = message.streaming === true;
   const displayContent = stripPredictionBlock(message.content);
   const sections = parseAssistantSections(displayContent) ?? [];
@@ -70,7 +74,7 @@ export default function AnalysisBubble({ message, showModelBlock = true }: Analy
       )}
 
       {/* ── Model output block: only on first occurrence ── */}
-      {showModelBlock && isStreaming && !simResult && message.hasModel !== false ? (
+      {showModelBlock && isStreaming && !sim && message.hasModel !== false ? (
         <div className="ab-model-block">
           {/* Label intentionally absent from skeleton — avoids false promise for non-result queries */}
           <div className="ab-skel ab-skel--bar" />
@@ -79,34 +83,42 @@ export default function AnalysisBubble({ message, showModelBlock = true }: Analy
             <div className="ab-skel ab-skel--box" />
           </div>
         </div>
-      ) : showModelBlock && simResult ? (
+      ) : showModelBlock && sim ? (
         <div className="ab-model-block">
           <span className="ab-block-label">
             Dixon-Coles · Monte Carlo · 15,000 simulations
           </span>
 
-          <OutcomeBar
-            homeTeam={homeTeam}
-            awayTeam={awayTeam}
-            homeWinPct={simResult.homeWinPct}
-            drawPct={simResult.drawPct}
-            awayWinPct={simResult.awayWinPct}
-          />
+          {sim.outcome && (
+            <OutcomeBar
+              homeTeam={homeTeam}
+              awayTeam={awayTeam}
+              homeWinPct={sim.outcome.homeWinPct}
+              drawPct={sim.outcome.drawPct}
+              awayWinPct={sim.outcome.awayWinPct}
+            />
+          )}
 
-          <div className="ab-two-col">
-            <XGComparison
-              homeTeam={homeTeam}
-              awayTeam={awayTeam}
-              lambda={simResult.lambda}
-              mu={simResult.mu}
-            />
-            <ScorelineGrid
-              scorelines={simResult.topScorelinesWithPct}
-              mostLikelyScore={simResult.mostLikelyScore}
-              homeTeam={homeTeam}
-              awayTeam={awayTeam}
-            />
-          </div>
+          {(sim.xg || sim.scorelines.length > 0) && (
+            <div className="ab-two-col">
+              {sim.xg && (
+                <XGComparison
+                  homeTeam={homeTeam}
+                  awayTeam={awayTeam}
+                  lambda={sim.xg.lambda}
+                  mu={sim.xg.mu}
+                />
+              )}
+              {sim.scorelines.length > 0 && (
+                <ScorelineGrid
+                  scorelines={sim.scorelines}
+                  mostLikelyScore={sim.mostLikelyScore}
+                  homeTeam={homeTeam}
+                  awayTeam={awayTeam}
+                />
+              )}
+            </div>
+          )}
 
           {adjustmentNotes && adjustmentNotes.length > 0 && (
             <AdjustmentNotes notes={adjustmentNotes} />

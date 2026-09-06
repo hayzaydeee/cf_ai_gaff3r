@@ -1,22 +1,20 @@
 // Top 6 predicted scorelines as a 3-column grid of mini-cards.
 // Most likely scoreline highlighted with orange border.
 
-interface Scoreline {
-  home: number;
-  away: number;
-  probability: number;
-}
+import type { Scoreline } from '../../utils/simResult';
 
 interface ScorelineGridProps {
   scorelines: Scoreline[];
-  mostLikelyScore: Scoreline;
+  mostLikelyScore: Scoreline | null;
   homeTeam: string;
   awayTeam: string;
 }
 
 export default function ScorelineGrid({ scorelines, mostLikelyScore, homeTeam, awayTeam }: ScorelineGridProps) {
   const top6 = scorelines.slice(0, 6);
-  const maxProb = top6[0]?.probability ?? 0.01;
+  const maxProb = top6[0]?.probability || 0.01;
+
+  if (top6.length === 0) return null;
 
   return (
     <div className="sg-wrap">
@@ -26,7 +24,7 @@ export default function ScorelineGrid({ scorelines, mostLikelyScore, homeTeam, a
       </div>
       <div className="sg-grid">
         {top6.map((s, i) => {
-          const isTop = s.home === mostLikelyScore.home && s.away === mostLikelyScore.away;
+          const isTop = s.home === mostLikelyScore?.home && s.away === mostLikelyScore?.away;
           const pct = (s.probability * 100).toFixed(1);
           const barWidth = Math.round((s.probability / maxProb) * 100);
           return (

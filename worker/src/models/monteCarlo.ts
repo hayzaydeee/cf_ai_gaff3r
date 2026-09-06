@@ -4,7 +4,7 @@
 //   - Top scorelines with individual probabilities
 //   - Confidence level derived from separation between outcome probabilities
 
-import { tauCorrection, scorelineProbability } from './dixonColes';
+import { tauCorrection, scorelineProbability, finiteOr, DEFAULT_RHO, PL_AVG_HOME_GOALS, PL_AVG_AWAY_GOALS } from './dixonColes';
 import type { Lambdas } from './dixonColes';
 
 // ── Types ──
@@ -70,7 +70,11 @@ function acceptDCCorrection(h: number, a: number, lambda: number, mu: number, rh
  * @param iterations  Number of simulated matches (default 15,000)
  */
 export function simulate(lambdas: Lambdas, iterations = 15_000): SimResult {
-  const { lambda, mu, rho } = lambdas;
+  // Last gate before the result is serialised to the client: NaN/Infinity would
+  // become `null` in JSON and blow up any consumer doing arithmetic on λ/μ.
+  const lambda = finiteOr(lambdas?.lambda, PL_AVG_HOME_GOALS);
+  const mu = finiteOr(lambdas?.mu, PL_AVG_AWAY_GOALS);
+  const rho = finiteOr(lambdas?.rho, DEFAULT_RHO);
 
   let homeWins = 0;
   let draws = 0;

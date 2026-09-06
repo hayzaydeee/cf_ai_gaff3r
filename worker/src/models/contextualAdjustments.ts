@@ -6,6 +6,7 @@
 // Returns adjusted { lambda, mu }.
 
 import type { PLTeamContext } from '../types/app';
+import { finiteOr } from './dixonColes';
 import type { Lambdas } from './dixonColes';
 
 // ── Constants ──
@@ -93,9 +94,11 @@ export function computePLAdjustments(
  * Apply contextual multipliers to base lambdas.
  */
 export function applyAdjustments(base: Lambdas, factors: ContextualFactors): Lambdas {
+  const lambda = base.lambda * finiteOr(factors.homeMultiplier, 1);
+  const mu = base.mu * finiteOr(factors.awayMultiplier, 1);
   return {
-    lambda: parseFloat((base.lambda * factors.homeMultiplier).toFixed(3)),
-    mu: parseFloat((base.mu * factors.awayMultiplier).toFixed(3)),
+    lambda: finiteOr(parseFloat(lambda.toFixed(3)), base.lambda),
+    mu: finiteOr(parseFloat(mu.toFixed(3)), base.mu),
     rho: base.rho,
   };
 }
@@ -114,7 +117,7 @@ function playerAbsenceMultiplier(
 
   // Total xG of the team's tracked key players
   const totalXG = team.keyPlayers.reduce((sum, p) => sum + (p.xG ?? 0), 0);
-  if (totalXG <= 0) return 1.0;
+  if (!(totalXG > 0)) return 1.0; // also catches NaN
 
   // Sum xG of unavailable attacking/midfield players
   const absentXG = team.keyPlayers
@@ -124,9 +127,9 @@ function playerAbsenceMultiplier(
     )
     .reduce((sum, p) => sum + (p.xG ?? 0), 0);
 
-  const xgShare = Math.min(absentXG / totalXG, MAX_XG_SHARE);
+  const xgShare = Math.min(finiteOr(absentXG, 0) / totalXG, MAX_XG_SHARE);
   // Penalty: up to -20% attack when highest-xG player is out
-  return 1 - xgShare * 0.45;
+  return finiteOr(1 - xgShare * 0.45, 1.0);
 }
 
 /**
@@ -144,7 +147,7 @@ function formFactor(team: PLTeamContext): number {
   const avgPts = weightedPts / maxWeightedPts; // 0–1
 
   // Map 0–1 → multiplier 0.88–1.12
-  return 0.88 + avgPts * 0.24;
+  return finiteOr(0.88 + avgPts * 0.24, 1.0);
 }
 
 /**
@@ -153,9 +156,11 @@ function formFactor(team: PLTeamContext): number {
  */
 function difficultyMultiplier(difficulty: number): number {
   // difficulty 1→1.05, 2→1.02, 3→1.00, 4→0.97, 5→0.94
-  return 1.0 - (difficulty - 3) * 0.03;
+  // Fixtures outside FPL don't always carry a difficulty rating — treat those as neutral.
+  return 1.0 - (finiteOr(difficulty, 3) - 3) * 0.03;
 }
 
 function clamp(v: number, min: number, max: number): number {
+  if (!Number.isFinite(v)) return 1.0;
   return Math.max(min, Math.min(v, max));
 }

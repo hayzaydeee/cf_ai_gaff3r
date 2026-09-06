@@ -104,3 +104,24 @@ describe('analyticalTopScorelinesWithPct', () => {
     expect(hasCommonScore).toBe(true);
   });
 });
+
+// ── Serialisation safety ──
+// NaN/Infinity survive in-process but become `null` in JSON, which crashes any client
+// doing arithmetic on λ/μ. simulate() is the last gate before the payload is sent.
+describe('simulate — non-finite input', () => {
+  const cases: Record<string, unknown> = {
+    NaN: { lambda: NaN, mu: NaN, rho: -0.13 },
+    Infinity: { lambda: Infinity, mu: -Infinity, rho: -0.13 },
+    missing: {},
+  };
+
+  for (const [name, lambdas] of Object.entries(cases)) {
+    it(`falls back to league averages for ${name} lambdas`, () => {
+      const result = simulate(lambdas as Lambdas, 2_000);
+      expect(Number.isFinite(result.lambda)).toBe(true);
+      expect(Number.isFinite(result.mu)).toBe(true);
+      expect(JSON.parse(JSON.stringify(result)).lambda).not.toBeNull();
+      expect(result.homeWinPct + result.drawPct + result.awayWinPct).toBe(100);
+    });
+  }
+});

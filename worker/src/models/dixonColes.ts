@@ -93,15 +93,17 @@ export function estimateLambdasFromFPL(
   homeTeam: PLTeamContext,
   awayTeam: PLTeamContext,
 ): Lambdas {
-  const homeAttack = homeTeam.strength.attackHome / FPL_STRENGTH_MID;
-  const awayDefence = awayTeam.strength.defenceAway / FPL_STRENGTH_MID;
-  const awayAttack = awayTeam.strength.attackAway / FPL_STRENGTH_MID;
-  const homeDefence = homeTeam.strength.defenceHome / FPL_STRENGTH_MID;
+  // Upstream FPL payloads occasionally omit a strength field; falling back to the
+  // league midpoint keeps the ratio at 1.0 instead of poisoning λ/μ with NaN.
+  const homeAttack = finiteOr(homeTeam.strength?.attackHome, FPL_STRENGTH_MID) / FPL_STRENGTH_MID;
+  const awayDefence = finiteOr(awayTeam.strength?.defenceAway, FPL_STRENGTH_MID) / FPL_STRENGTH_MID;
+  const awayAttack = finiteOr(awayTeam.strength?.attackAway, FPL_STRENGTH_MID) / FPL_STRENGTH_MID;
+  const homeDefence = finiteOr(homeTeam.strength?.defenceHome, FPL_STRENGTH_MID) / FPL_STRENGTH_MID;
 
   // Expected goals = (attack strength / avg) × (1 / opponent defence ratio) × avg goals
   // Stronger attack × weaker opponent defence → more goals
-  const lambda = clampLambda((homeAttack / awayDefence) * PL_AVG_HOME_GOALS * HOME_ADVANTAGE);
-  const mu = clampLambda((awayAttack / homeDefence) * PL_AVG_AWAY_GOALS);
+  const lambda = clampLambda((homeAttack / awayDefence) * PL_AVG_HOME_GOALS * HOME_ADVANTAGE, PL_AVG_HOME_GOALS);
+  const mu = clampLambda((awayAttack / homeDefence) * PL_AVG_AWAY_GOALS, PL_AVG_AWAY_GOALS);
 
   return { lambda, mu, rho: DEFAULT_RHO };
 }
@@ -114,25 +116,33 @@ export function estimateLambdasFromLeagueStats(
   homeTeam: StandardTeamContext,
   awayTeam: StandardTeamContext,
 ): Lambdas {
-  const homePlayed = Math.max(homeTeam.played, 1);
-  const awayPlayed = Math.max(awayTeam.played, 1);
+  const homePlayed = Math.max(finiteOr(homeTeam.played, 1), 1);
+  const awayPlayed = Math.max(finiteOr(awayTeam.played, 1), 1);
 
-  const homeGoalsPerGame = homeTeam.goalsFor / homePlayed;
-  const awayGoalsPerGame = awayTeam.goalsFor / awayPlayed;
-  const homeConcedePerGame = homeTeam.goalsAgainst / homePlayed;
-  const awayConcedePerGame = awayTeam.goalsAgainst / awayPlayed;
+  const homeGoalsPerGame = finiteOr(homeTeam.goalsFor, 0) / homePlayed;
+  const awayGoalsPerGame = finiteOr(awayTeam.goalsFor, 0) / awayPlayed;
+  const homeConcedePerGame = finiteOr(homeTeam.goalsAgainst, 0) / homePlayed;
+  const awayConcedePerGame = finiteOr(awayTeam.goalsAgainst, 0) / awayPlayed;
 
   // League average goals conceded per game (proxy — use both teams as sample)
   const avgConcede = (homeConcedePerGame + awayConcedePerGame) / 2 || 1.2;
 
   // λ = home attack rate × (away defensive weakness / avg)
-  const lambda = clampLambda(homeGoalsPerGame * (awayConcedePerGame / avgConcede) * 1.05); // small home boost
-  const mu = clampLambda(awayGoalsPerGame * (homeConcedePerGame / avgConcede));
+  const lambda = clampLambda(homeGoalsPerGame * (awayConcedePerGame / avgConcede) * 1.05, PL_AVG_HOME_GOALS); // small home boost
+  const mu = clampLambda(awayGoalsPerGame * (homeConcedePerGame / avgConcede), PL_AVG_AWAY_GOALS);
 
   return { lambda, mu, rho: DEFAULT_RHO };
 }
 
-// Clamp expected goals to a realistic range
-function clampLambda(v: number): number {
+// Clamp expected goals to a realistic range.
+// Non-finite input (missing upstream stats, division by zero) falls back rather than
+// propagating NaN/Infinity — those serialise to `null` over JSON and break the client.
+function clampLambda(v: number, fallback: number): number {
+  if (!Number.isFinite(v)) return fallback;
   return Math.max(0.3, Math.min(v, 4.0));
+}
+
+/** Coerce a possibly missing/NaN numeric field to a usable number. */
+export function finiteOr(v: number | null | undefined, fallback: number): number {
+  return typeof v === 'number' && Number.isFinite(v) ? v : fallback;
 }

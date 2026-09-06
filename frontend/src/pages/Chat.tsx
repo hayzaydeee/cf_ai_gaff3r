@@ -11,6 +11,7 @@ import ChatInput from '../components/chat/ChatInput';
 import MessageBubble from '../components/chat/MessageBubble';
 import MatchContext from '../components/chat/MatchContext';
 import ClubLogo from '../components/common/ClubLogo';
+import { normalizeSimResult } from '../utils/simResult';
 
 export default function Chat() {
   const { fixtureId: fixtureIdParam } = useParams<{ fixtureId?: string }>();
@@ -155,7 +156,8 @@ export default function Chat() {
           )}
 
           {(() => {
-            const firstSimIdx = messages.findIndex(m => m.simResult);
+            // Only messages whose model payload is actually renderable claim the block.
+            const firstSimIdx = messages.findIndex(m => normalizeSimResult(m.simResult));
             return messages.map((msg, i) => (
               <MessageBubble
                 key={msg.id}

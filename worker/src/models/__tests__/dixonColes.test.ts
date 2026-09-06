@@ -175,3 +175,28 @@ describe('estimateLambdasFromLeagueStats', () => {
     expect(() => estimateLambdasFromLeagueStats(zeroPlayed, zeroPlayed)).not.toThrow();
   });
 });
+
+// ── Missing upstream stats ──
+describe('lambda estimation with incomplete data', () => {
+  it('estimateLambdasFromFPL falls back when strength fields are missing', () => {
+    const team = (strength: Record<string, number>) => ({ strength } as never);
+    const { lambda, mu } = estimateLambdasFromFPL(team({}), team({}));
+    expect(Number.isFinite(lambda)).toBe(true);
+    expect(Number.isFinite(mu)).toBe(true);
+  });
+
+  it('estimateLambdasFromFPL survives a zero defence rating', () => {
+    const home = { strength: { attackHome: 1200, attackAway: 1100, defenceHome: 1100, defenceAway: 1100 } } as never;
+    const away = { strength: { attackHome: 1100, attackAway: 1000, defenceHome: 1100, defenceAway: 0 } } as never;
+    const { lambda, mu } = estimateLambdasFromFPL(home, away);
+    expect(Number.isFinite(lambda)).toBe(true);
+    expect(Number.isFinite(mu)).toBe(true);
+  });
+
+  it('estimateLambdasFromLeagueStats survives missing goal counts', () => {
+    const team = { played: 10 } as never;
+    const { lambda, mu } = estimateLambdasFromLeagueStats(team, team);
+    expect(Number.isFinite(lambda)).toBe(true);
+    expect(Number.isFinite(mu)).toBe(true);
+  });
+});

@@ -9,6 +9,10 @@ interface XGComparisonProps {
 }
 
 export default function XGComparison({ homeTeam, awayTeam, lambda, mu }: XGComparisonProps) {
+  // Callers pass values normalised by normalizeSimResult; this is a belt-and-braces
+  // guard so a raw payload can never crash the bubble on .toFixed().
+  if (!Number.isFinite(lambda) || !Number.isFinite(mu)) return null;
+
   const total = lambda + mu || 1;
   const homeWidth = Math.round((lambda / total) * 100);
   const awayWidth = 100 - homeWidth;
